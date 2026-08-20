@@ -1,0 +1,21 @@
+version: 1
+
+workflow:
+  id: hello
+
+  input:
+    name: string
+
+  nodes:
+    - id: greet
+      type: template
+      config:
+        template: "Hello {{ name }}"
+
+  edges:
+    - from: input.name
+      to: greet.name
+
+  output:
+    message:
+      from: greet.output
