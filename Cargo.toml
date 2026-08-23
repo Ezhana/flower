@@ -14,3 +14,4 @@ thiserror = "2"
 yaml_serde = "0.10"
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
+wit-bindgen = "0.47"

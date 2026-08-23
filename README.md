@@ -2,7 +2,7 @@
 
 Flower 是一套面向可移植工作流运行时的、语言与平台无关的执行规范，以及该规范的 Rust 参考实现。
 
-项目仍处于架构探索期。当前仓库只有 workspace、示例流程和模块占位代码，尚不具备可用的解析、执行、WASM、FFI 或持久化能力。现阶段的首要目标是收敛最小语义核心，而不是承诺完整 API。
+项目仍处于早期阶段。当前已完成线性流程的最小纵向切片：Rust 验证并执行 `start -> activity* -> finish`，同一确定性内核可通过 WIT Component 在 Go 中推进。gateway、edge condition、持久化、重试、取消、YAML 解析和 FFI 尚未实现；现有 API 只承诺该最小语义边界。
 
 ## 核心定位
 
@@ -13,7 +13,7 @@ Flower 将稳定语义与具体实现技术分开：
 - WebAssembly Component Model 是隔离并分发跨语言节点的首选格式；
 - WIT 是 Component Model 的绑定，不是 Flower 的语义来源；
 - WASI 是可选的标准能力集合，不会默认授予节点完整系统权限；
-- C ABI 与进程外 API 面向“应用调用运行时”，WIT 面向“运行时加载扩展”，两类边界解决不同问题；
+- 原生 API、WIT 执行内核与进程外 API 面向“应用调用运行时”，扩展 Node 使用独立的 WIT world；两类边界不能混成一个 Host API；
 - 规范文档解释语义，一致性测试验证实现。
 
 ```text
@@ -27,7 +27,7 @@ Flower 将稳定语义与具体实现技术分开：
         native binding   component binding  service binding
             C ABI           WIT / WASM        HTTP / RPC
               │                │                │
-        host applications  sandboxed nodes   remote clients
+        host applications  Go hosts / nodes  remote clients
 ```
 
 详细边界见 [架构说明](docs/architecture.md) 和 [ADR 索引](docs/adr/README.md)。
@@ -61,18 +61,32 @@ current state + event -> transition(new state, effects[])
 
 ```text
 crates/
-  flower-ir/        # 计划中的语言无关 IR
-  flower-compiler/  # 计划中的解析、验证与生成管线
-  flower-runtime/   # 计划中的 Rust 参考运行时
-  flower-cli/       # 计划中的命令行入口
+  flower-ir/        # 已验证、规范化的语言无关 IR
+  flower-compiler/  # 输入模型到 IR 的编译边界
+  flower-runtime/   # Event/Effect 状态机与原生 runner
+  flower-component/ # 确定性执行内核的 WIT Component adapter
+  flower-cli/       # 尚未实现的命令行入口
 docs/               # 架构、规范、路线图与 ADR
 examples/           # 流程定义示例
 ffi/                # 预留的原生 C ABI
-sdk/                # 预留的语言 SDK
-wits/               # 预留的 WIT binding
+sdk/                # Go SDK 与后续语言 binding
+wits/               # 版本化 WIT contract
 ```
 
-以上目录中的“计划中”不是完成状态。以 [路线图](docs/roadmap.md) 的验收条件为准。
+`flower-ir` 与 `flower-runtime` 已实现线性切片，Compiler、CLI 及其余运行时能力仍在演进。以 [路线图](docs/roadmap.md) 的验收条件为准。
+
+## 构建 Component 与运行 Go 测试
+
+需要安装 Rust 的 `wasm32-unknown-unknown` target、`wasm-tools` 与 Go 1.25.5+：
+
+```bash
+rustup target add wasm32-unknown-unknown
+cargo install wasm-tools --version 1.240.0 --locked
+scripts/build-component.sh
+cd sdk/go && go test ./...
+```
+
+Component 刻意不导入 WASI。Go SDK 负责执行 Runtime 返回的 Effect，并把完成事件连同 snapshot 送回 Rust 内核。
 
 ## 代码风格与质量检查
 
@@ -86,7 +100,7 @@ cargo test --workspace --all-features
 
 `rustfmt` 负责确定性的代码排版；Clippy 负责可疑写法和惯用法检查；测试负责行为验证。格式问题使用 `cargo fmt --all` 自动修复，Clippy 告警必须通过代码修改或有明确依据的局部 `#[allow(...)]` 解决，不能在 workspace 级别静默关闭。
 
-当前检查只能验证 workspace 占位 crate 的工程基线，不能证明 Flower 的目标语义已经实现。
+当前检查覆盖线性流程的结构验证、Rust 原生执行、WIT Component 构建与 Go 端到端调用；它不能证明尚未实现的 gateway、持久化、重试或取消语义。
 
 示例流程位于 [`examples/hello.flower.yaml`](examples/hello.flower.yaml)。它目前用于讨论输入格式，不代表已经冻结的 schema。
 

@@ -1,7 +1,8 @@
 # ADR-0002：原生 Rust 参考运行时，WASM Component 用于扩展节点
 
-- Status: Accepted
+- Status: Superseded
 - Date: 2026-08-21
+- Superseded by: [ADR-0005](0005-portable-deterministic-engine-component.md)
 
 ## Context
 

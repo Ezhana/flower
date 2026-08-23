@@ -2,7 +2,7 @@
 
 路线图按可验证的退出条件组织，不承诺日期。任何阶段都不能仅以“创建了目录”或“定义了接口”视为完成。
 
-## Phase 0：统一语言与决策记录（当前）
+## Phase 0：统一语言与决策记录
 
 目标：建立单一项目命名、核心词汇、系统边界和 ADR 流程。
 
@@ -25,7 +25,7 @@
 
 退出条件：独立实现者不阅读 Rust 源码，也能根据规范通过核心测试。
 
-## Phase 2：Rust 参考实现
+## Phase 2：Rust 参考实现（进行中）
 
 目标：用 Rust 验证语义，而不是让 Rust API 反向定义规范。
 
@@ -38,9 +38,9 @@
 
 退出条件：示例 Workflow 能通过 CLI 执行，并通过 Phase 1 的全部 conformance cases。
 
-## Phase 3：WIT / WebAssembly Component binding
+## Phase 3：WIT / WebAssembly Component binding（执行内核纵向切片已完成）
 
-目标：验证跨语言扩展节点，而不是把完整 Runtime 搬进 WASM。
+目标：验证跨语言扩展节点，并为外部 Host 提供不含 I/O 的确定性执行内核；不把完整 Runtime 搬进 WASM。
 
 交付物：
 

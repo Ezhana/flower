@@ -1,14 +1,14 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+use flower_ir::{Workflow, WorkflowDefinition, WorkflowValidationError};
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Converts an input-facing workflow definition into validated runtime IR.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct WorkflowCompiler;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+impl WorkflowCompiler {
+    pub fn compile(
+        &self,
+        definition: WorkflowDefinition,
+    ) -> Result<Workflow, WorkflowValidationError> {
+        Workflow::try_from(definition)
     }
 }

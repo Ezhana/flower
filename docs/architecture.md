@@ -6,11 +6,11 @@
 
 截至当前版本：
 
-- workspace 包含 `flower-ir`、`flower-compiler`、`flower-runtime` 和 `flower-cli`；
-- 四个 crate 都还是默认占位实现；
-- WIT 与 C 头文件为空；
-- 示例 YAML 尚未绑定到正式 schema；
-- 尚无 conformance suite、持久化、调度器或 WASM Host。
+- `flower-ir` 已实现带强类型标识的线性 Workflow aggregate，并在构造时验证结构不变量；
+- `flower-runtime` 已实现 `start -> activity* -> finish` 的确定性 Event/Effect 状态转换与原生 runner；
+- `flower-component` 通过 `flower:engine/workflow-engine@0.1.0` 导出同一内核；
+- Go SDK 已能加载 Component、推进节点完成事件，并有跨 Canonical ABI 的端到端测试；
+- gateway、edge condition、持久化、重试、取消、YAML schema 与通用调度器尚未实现。
 
 因此，当前最重要的产物是可审查的边界和可执行的语义测试，而不是扩展更多目录。
 
@@ -114,12 +114,12 @@ Backend 不得改变节点状态、重试或错误的公共含义。
 
 ### 5. Bindings
 
-Flower 计划支持三类互补绑定：
+Flower 支持或计划支持三类互补绑定：
 
 | 绑定 | 主要用途 | 特点 |
 | --- | --- | --- |
 | Native / C ABI | 同进程宿主应用 | 低开销；需处理平台打包和内存所有权 |
-| WIT / Component | 跨语言扩展节点 | 类型化、可移植、能力受控 |
+| WIT / Component | 跨语言扩展节点；嵌入确定性内核 | 类型化、可移植、能力受控；不同 world 独立版本化 |
 | HTTP / RPC | 进程外客户端或 Worker | 覆盖面广；引入部署与网络边界 |
 
 ## 执行内核
@@ -153,7 +153,7 @@ Flower 对三者的定位不同：
 - WIT 描述 Component 的 import/export 类型边界；
 - WASI 提供时钟、文件、网络等标准 Host 能力。
 
-首选形态是“Native Rust Engine，Extension WASM”，而不是把数据库、调度、恢复和系统集成都塞进 WASM Engine。节点通常应优先依赖 Flower 定义的窄能力，例如 `flower:log`、`flower:http`、`flower:secret`，由 Host 记录其结果；只有无需纳入确定性记录的能力才考虑直接授予 WASI。
+完整 Host 的首选形态仍是 Native Rust。无 I/O 的确定性状态转换内核同时发布为 Component，供 Go 等 Host 嵌入；数据库、调度、恢复和系统集成不得进入该 Component。节点通常应优先依赖 Flower 定义的窄能力，例如 `flower:log`、`flower:http`、`flower:secret`，由 Host 记录其结果；只有无需纳入确定性记录的能力才考虑直接授予 WASI。详见 [ADR-0005](adr/0005-portable-deterministic-engine-component.md)。
 
 ## Agent Workflow Profile
 
