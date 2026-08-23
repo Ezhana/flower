@@ -6,8 +6,9 @@ type SpecificationVersion struct {
 }
 
 type PlanNode struct {
-	ID   string   `json:"id"`
-	Kind NodeKind `json:"kind"`
+	ID          string       `json:"id"`
+	Kind        NodeKind     `json:"kind"`
+	RetryPolicy *RetryPolicy `json:"retry_policy"`
 }
 
 type ExecutableWorkflowPlan struct {

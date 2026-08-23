@@ -1,14 +1,30 @@
-package flower:engine@0.1.0;
+package flower:engine@0.2.0;
 
 interface workflow-engine {
     record specification-version { major: u16, minor: u16 }
     enum node-kind { start, activity, finish }
-    record node-definition { id: string, kind: node-kind }
+    record fixed-backoff { delay-ms: u64 }
+    record exponential-backoff {
+        initial-delay-ms: u64,
+        multiplier: u32,
+        maximum-delay-ms: u64,
+    }
+    variant backoff-policy {
+        none,
+        fixed(fixed-backoff),
+        exponential(exponential-backoff),
+    }
+    record retry-policy {
+        max-attempts: u32,
+        retryable-failure-codes: list<string>,
+        backoff: backoff-policy,
+    }
+    record node-definition { id: string, kind: node-kind, retry-policy: option<retry-policy> }
     record edge-definition { id: string, source: string, target: string }
     record workflow-definition { id: string, nodes: list<node-definition>, edges: list<edge-definition> }
     record diagnostic { code: string, message: string, subject: option<string> }
 
-    record plan-node { id: string, kind: node-kind }
+    record plan-node { id: string, kind: node-kind, retry-policy: option<retry-policy> }
     record executable-workflow-plan {
         specification-version: specification-version,
         workflow-id: string,
@@ -22,8 +38,39 @@ interface workflow-engine {
     }
 
     record payload { media-type: string, bytes: list<u8> }
-    record awaiting-node { node-id: string, effect-id: string, input: payload }
-    variant execution-state { awaiting-node(awaiting-node), completed(payload) }
+    record node-activation {
+        activation-id: string,
+        activation-revision: u64,
+        node-id: string,
+        input: payload,
+    }
+    record node-attempt { attempt-id: string, attempt-number: u32, effect-id: string }
+    record attempt-failure { code: string, details: option<payload> }
+    record retry-timer {
+        timer-id: string,
+        effect-id: string,
+        failed-attempt-id: string,
+        next-attempt-number: u32,
+        delay-ms: u64,
+    }
+    record awaiting-attempt { activation: node-activation, attempt: node-attempt }
+    record waiting-for-retry {
+        activation: node-activation,
+        attempt: node-attempt,
+        failure: attempt-failure,
+        timer: retry-timer,
+    }
+    record failed-execution {
+        activation: node-activation,
+        attempt: node-attempt,
+        failure: attempt-failure,
+    }
+    variant execution-state {
+        awaiting-attempt(awaiting-attempt),
+        waiting-for-retry(waiting-for-retry),
+        completed(payload),
+        failed(failed-execution),
+    }
     record execution-snapshot {
         execution-id: string,
         plan-reference: plan-reference,
@@ -37,18 +84,63 @@ interface workflow-engine {
         plan-reference: plan-reference,
         input: payload,
     }
-    record node-completed-event {
+    record node-attempt-succeeded-event {
         event-id: string,
         execution-id: string,
         expected-revision: u64,
+        activation-id: string,
+        attempt-id: string,
+        attempt-number: u32,
         effect-id: string,
         node-id: string,
         output: payload,
     }
-    variant execution-event { execution-started(execution-started-event), node-completed(node-completed-event) }
+    record node-attempt-failed-event {
+        event-id: string,
+        execution-id: string,
+        expected-revision: u64,
+        activation-id: string,
+        attempt-id: string,
+        attempt-number: u32,
+        effect-id: string,
+        node-id: string,
+        failure: attempt-failure,
+    }
+    record timer-fired-event {
+        event-id: string,
+        execution-id: string,
+        expected-revision: u64,
+        timer-id: string,
+        activation-id: string,
+        next-attempt-number: u32,
+    }
+    variant execution-event {
+        execution-started(execution-started-event),
+        node-attempt-succeeded(node-attempt-succeeded-event),
+        node-attempt-failed(node-attempt-failed-event),
+        timer-fired(timer-fired-event),
+    }
 
-    record execute-node-effect { effect-id: string, execution-id: string, node-id: string, input: payload }
-    variant execution-effect { execute-node(execute-node-effect) }
+    record execute-node-attempt-effect {
+        effect-id: string,
+        activation-id: string,
+        attempt-id: string,
+        attempt-number: u32,
+        node-id: string,
+        input: payload,
+    }
+    record schedule-timer-effect {
+        effect-id: string,
+        timer-id: string,
+        activation-id: string,
+        failed-attempt-id: string,
+        next-attempt-number: u32,
+        delay-ms: u64,
+    }
+    variant execution-effect {
+        execute-node-attempt(execute-node-attempt-effect),
+        schedule-timer(schedule-timer-effect),
+    }
     record transition-result { snapshot: execution-snapshot, effects: list<execution-effect> }
     record engine-error { code: string, message: string }
 

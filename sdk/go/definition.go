@@ -9,8 +9,31 @@ const (
 )
 
 type NodeDefinition struct {
-	ID   string   `json:"id"`
-	Kind NodeKind `json:"kind"`
+	ID          string       `json:"id"`
+	Kind        NodeKind     `json:"kind"`
+	RetryPolicy *RetryPolicy `json:"retry_policy"`
+}
+
+type BackoffKind string
+
+const (
+	NoBackoff          BackoffKind = "none"
+	FixedBackoff       BackoffKind = "fixed"
+	ExponentialBackoff BackoffKind = "exponential"
+)
+
+type BackoffPolicy struct {
+	Type           BackoffKind `json:"type"`
+	DelayMs        uint64      `json:"delay_ms,omitempty"`
+	InitialDelayMs uint64      `json:"initial_delay_ms,omitempty"`
+	Multiplier     uint32      `json:"multiplier,omitempty"`
+	MaximumDelayMs uint64      `json:"maximum_delay_ms,omitempty"`
+}
+
+type RetryPolicy struct {
+	MaxAttempts           uint32        `json:"max_attempts"`
+	RetryableFailureCodes []string      `json:"retryable_failure_codes"`
+	Backoff               BackoffPolicy `json:"backoff"`
 }
 
 type EdgeDefinition struct {

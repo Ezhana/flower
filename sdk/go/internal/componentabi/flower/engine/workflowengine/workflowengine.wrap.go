@@ -69,7 +69,7 @@ func (w *workflowEngineWrapper) Transition(ctx context.Context, plan ExecutableW
 	{
 		callErr_ := w.fnTransition.CallRaw(ctx, w.callerInst,
 			func(caller, callee *host.CallContext, stack []uint64) {
-				paramsPtr_, err_ := callee.Realloc(ctx, 0, 0, 8, 184)
+				paramsPtr_, err_ := callee.Realloc(ctx, 0, 0, 8, 312)
 				if err_ != nil {
 					resErr_ = fmt.Errorf("wacogo/witgen: allocate indirect parameters: %w", err_)
 					return
@@ -85,7 +85,7 @@ func (w *workflowEngineWrapper) Transition(ctx context.Context, plan ExecutableW
 					resErr_ = err_
 					return
 				}
-				if err_ := lowerMemExecutionEvent(ctx, caller, callee, h, w.fnTransition.ParamType(2), paramsPtr_+120, arg2_); err_ != nil {
+				if err_ := lowerMemExecutionEvent(ctx, caller, callee, h, w.fnTransition.ParamType(2), paramsPtr_+216, arg2_); err_ != nil {
 					resErr_ = err_
 					return
 				}

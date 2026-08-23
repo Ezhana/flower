@@ -13,7 +13,7 @@ import (
 	"testing"
 )
 
-const fixtureSchemaVersion = "flower.conformance/v0.1"
+const fixtureSchemaVersion = "flower.conformance/v0.2"
 
 type conformanceFixture struct {
 	SchemaVersion   string                    `json:"schema_version"`
@@ -55,31 +55,70 @@ type fixtureExecutionSnapshot struct {
 }
 
 type fixtureExecutionState struct {
-	Type     string          `json:"type"`
-	NodeID   string          `json:"node_id"`
-	EffectID string          `json:"effect_id"`
-	Input    *fixturePayload `json:"input"`
-	Output   *fixturePayload `json:"output"`
+	Type       string                 `json:"type"`
+	Activation *fixtureNodeActivation `json:"activation"`
+	Attempt    *fixtureNodeAttempt    `json:"attempt"`
+	Failure    *fixtureAttemptFailure `json:"failure"`
+	Timer      *fixtureRetryTimer     `json:"timer"`
+	Output     *fixturePayload        `json:"output"`
+}
+
+type fixtureNodeActivation struct {
+	ActivationID       string         `json:"activation_id"`
+	ActivationRevision uint64         `json:"activation_revision"`
+	NodeID             string         `json:"node_id"`
+	Input              fixturePayload `json:"input"`
+}
+
+type fixtureNodeAttempt struct {
+	AttemptID     string `json:"attempt_id"`
+	AttemptNumber uint32 `json:"attempt_number"`
+	EffectID      string `json:"effect_id"`
+}
+
+type fixtureAttemptFailure struct {
+	Code    string          `json:"code"`
+	Details *fixturePayload `json:"details"`
+}
+
+type fixtureRetryTimer struct {
+	TimerID           string `json:"timer_id"`
+	EffectID          string `json:"effect_id"`
+	FailedAttemptID   string `json:"failed_attempt_id"`
+	NextAttemptNumber uint32 `json:"next_attempt_number"`
+	DelayMs           uint64 `json:"delay_ms"`
 }
 
 type fixtureExecutionEvent struct {
-	Type             string          `json:"type"`
-	EventID          string          `json:"event_id"`
-	ExecutionID      string          `json:"execution_id"`
-	PlanReference    *PlanReference  `json:"plan_reference"`
-	Input            *fixturePayload `json:"input"`
-	ExpectedRevision *uint64         `json:"expected_revision"`
-	EffectID         string          `json:"effect_id"`
-	NodeID           string          `json:"node_id"`
-	Output           *fixturePayload `json:"output"`
+	Type              string                 `json:"type"`
+	EventID           string                 `json:"event_id"`
+	ExecutionID       string                 `json:"execution_id"`
+	PlanReference     *PlanReference         `json:"plan_reference"`
+	Input             *fixturePayload        `json:"input"`
+	ExpectedRevision  *uint64                `json:"expected_revision"`
+	ActivationID      string                 `json:"activation_id"`
+	AttemptID         string                 `json:"attempt_id"`
+	AttemptNumber     *uint32                `json:"attempt_number"`
+	EffectID          string                 `json:"effect_id"`
+	NodeID            string                 `json:"node_id"`
+	Output            *fixturePayload        `json:"output"`
+	Failure           *fixtureAttemptFailure `json:"failure"`
+	TimerID           string                 `json:"timer_id"`
+	NextAttemptNumber *uint32                `json:"next_attempt_number"`
 }
 
 type fixtureExecutionEffect struct {
-	Type        string         `json:"type"`
-	EffectID    string         `json:"effect_id"`
-	ExecutionID string         `json:"execution_id"`
-	NodeID      string         `json:"node_id"`
-	Input       fixturePayload `json:"input"`
+	Type              string         `json:"type"`
+	EffectID          string         `json:"effect_id"`
+	ActivationID      string         `json:"activation_id"`
+	AttemptID         string         `json:"attempt_id"`
+	AttemptNumber     uint32         `json:"attempt_number"`
+	TimerID           string         `json:"timer_id"`
+	FailedAttemptID   string         `json:"failed_attempt_id"`
+	NextAttemptNumber uint32         `json:"next_attempt_number"`
+	DelayMs           uint64         `json:"delay_ms"`
+	NodeID            string         `json:"node_id"`
+	Input             fixturePayload `json:"input"`
 }
 
 func TestComponentExecutesEverySharedFixtureExpectation(t *testing.T) {
@@ -99,7 +138,7 @@ func TestComponentExecutesEverySharedFixtureExpectation(t *testing.T) {
 		}
 	})
 
-	paths, err := filepath.Glob(filepath.Join("..", "..", "spec", "v0.1", "fixtures", "*.json"))
+	paths, err := filepath.Glob(filepath.Join("..", "..", "spec", "v0.2", "fixtures", "*.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +177,7 @@ func TestCompileReturnsPublicToABIConversionErrors(t *testing.T) {
 }
 
 func TestTamperingAnyExpectedJSONValueChangesTheTypedExpectation(t *testing.T) {
-	paths, err := filepath.Glob(filepath.Join("..", "..", "spec", "v0.1", "fixtures", "*.json"))
+	paths, err := filepath.Glob(filepath.Join("..", "..", "spec", "v0.2", "fixtures", "*.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -422,17 +461,17 @@ func (value fixtureExecutionSnapshot) toPublic() (ExecutionSnapshot, error) {
 
 func (value fixtureExecutionState) toPublic() (ExecutionState, error) {
 	switch value.Type {
-	case "awaiting-node":
-		if value.Input == nil || value.Output != nil {
-			return nil, fmt.Errorf("awaiting-node state has invalid shape")
+	case "awaiting-attempt":
+		if value.Activation == nil || value.Attempt == nil || value.Failure != nil || value.Timer != nil || value.Output != nil {
+			return nil, fmt.Errorf("awaiting-attempt state has invalid shape")
 		}
-		input, err := value.Input.toPublic()
+		activation, err := value.Activation.toPublic()
 		if err != nil {
 			return nil, err
 		}
-		return AwaitingNode{NodeID: value.NodeID, EffectID: value.EffectID, Input: input}, nil
+		return AwaitingAttempt{Activation: activation, Attempt: value.Attempt.toPublic()}, nil
 	case "completed":
-		if value.Output == nil || value.Input != nil || value.NodeID != "" || value.EffectID != "" {
+		if value.Output == nil || value.Activation != nil || value.Attempt != nil || value.Failure != nil || value.Timer != nil {
 			return nil, fmt.Errorf("completed state has invalid shape")
 		}
 		output, err := value.Output.toPublic()
@@ -440,15 +479,84 @@ func (value fixtureExecutionState) toPublic() (ExecutionState, error) {
 			return nil, err
 		}
 		return Completed{Output: output}, nil
+	case "failed":
+		if value.Activation == nil || value.Attempt == nil || value.Failure == nil || value.Timer != nil || value.Output != nil {
+			return nil, fmt.Errorf("failed state has invalid shape")
+		}
+		activation, err := value.Activation.toPublic()
+		if err != nil {
+			return nil, err
+		}
+		failure, err := value.Failure.toPublic()
+		if err != nil {
+			return nil, err
+		}
+		return Failed{Activation: activation, Attempt: value.Attempt.toPublic(), Failure: failure}, nil
+	case "waiting-for-retry":
+		if value.Activation == nil || value.Attempt == nil || value.Failure == nil || value.Timer == nil || value.Output != nil {
+			return nil, fmt.Errorf("waiting-for-retry state has invalid shape")
+		}
+		activation, err := value.Activation.toPublic()
+		if err != nil {
+			return nil, err
+		}
+		failure, err := value.Failure.toPublic()
+		if err != nil {
+			return nil, err
+		}
+		return WaitingForRetry{
+			Activation: activation, Attempt: value.Attempt.toPublic(), Failure: failure,
+			Timer: value.Timer.toPublic(),
+		}, nil
 	default:
 		return nil, fmt.Errorf("unknown execution state %q", value.Type)
 	}
 }
 
+func (value fixtureRetryTimer) toPublic() RetryTimer {
+	return RetryTimer{
+		TimerID: value.TimerID, EffectID: value.EffectID, FailedAttemptID: value.FailedAttemptID,
+		NextAttemptNumber: value.NextAttemptNumber, DelayMs: value.DelayMs,
+	}
+}
+
+func (value fixtureNodeActivation) toPublic() (NodeActivation, error) {
+	input, err := value.Input.toPublic()
+	if err != nil {
+		return NodeActivation{}, err
+	}
+	return NodeActivation{
+		ActivationID:       value.ActivationID,
+		ActivationRevision: value.ActivationRevision,
+		NodeID:             value.NodeID,
+		Input:              input,
+	}, nil
+}
+
+func (value fixtureNodeAttempt) toPublic() NodeAttempt {
+	return NodeAttempt{
+		AttemptID:     value.AttemptID,
+		AttemptNumber: value.AttemptNumber,
+		EffectID:      value.EffectID,
+	}
+}
+
+func (value fixtureAttemptFailure) toPublic() (AttemptFailure, error) {
+	var details *Payload
+	if value.Details != nil {
+		converted, err := value.Details.toPublic()
+		if err != nil {
+			return AttemptFailure{}, err
+		}
+		details = &converted
+	}
+	return AttemptFailure{Code: value.Code, Details: details}, nil
+}
+
 func (value fixtureExecutionEvent) toPublic() (ExecutionEvent, error) {
 	switch value.Type {
 	case "execution-started":
-		if value.PlanReference == nil || value.Input == nil || value.ExpectedRevision != nil || value.Output != nil || value.EffectID != "" || value.NodeID != "" {
+		if value.PlanReference == nil || value.Input == nil || value.ExpectedRevision != nil || value.AttemptNumber != nil || value.NextAttemptNumber != nil || value.Output != nil || value.Failure != nil || value.ActivationID != "" || value.AttemptID != "" || value.EffectID != "" || value.TimerID != "" || value.NodeID != "" {
 			return nil, fmt.Errorf("execution-started event has invalid shape")
 		}
 		input, err := value.Input.toPublic()
@@ -461,21 +569,52 @@ func (value fixtureExecutionEvent) toPublic() (ExecutionEvent, error) {
 			PlanReference: *value.PlanReference,
 			Input:         input,
 		}, nil
-	case "node-completed":
-		if value.PlanReference != nil || value.Input != nil || value.ExpectedRevision == nil || value.Output == nil {
-			return nil, fmt.Errorf("node-completed event has invalid shape")
+	case "node-attempt-succeeded":
+		if value.PlanReference != nil || value.Input != nil || value.ExpectedRevision == nil || value.AttemptNumber == nil || value.Output == nil || value.Failure != nil {
+			return nil, fmt.Errorf("node-attempt-succeeded event has invalid shape")
 		}
 		output, err := value.Output.toPublic()
 		if err != nil {
 			return nil, err
 		}
-		return NodeCompleted{
+		return NodeAttemptSucceeded{
 			EventID:          value.EventID,
 			ExecutionID:      value.ExecutionID,
 			ExpectedRevision: *value.ExpectedRevision,
+			ActivationID:     value.ActivationID,
+			AttemptID:        value.AttemptID,
+			AttemptNumber:    *value.AttemptNumber,
 			EffectID:         value.EffectID,
 			NodeID:           value.NodeID,
 			Output:           output,
+		}, nil
+	case "node-attempt-failed":
+		if value.PlanReference != nil || value.Input != nil || value.ExpectedRevision == nil || value.AttemptNumber == nil || value.Output != nil || value.Failure == nil {
+			return nil, fmt.Errorf("node-attempt-failed event has invalid shape")
+		}
+		failure, err := value.Failure.toPublic()
+		if err != nil {
+			return nil, err
+		}
+		return NodeAttemptFailed{
+			EventID:          value.EventID,
+			ExecutionID:      value.ExecutionID,
+			ExpectedRevision: *value.ExpectedRevision,
+			ActivationID:     value.ActivationID,
+			AttemptID:        value.AttemptID,
+			AttemptNumber:    *value.AttemptNumber,
+			EffectID:         value.EffectID,
+			NodeID:           value.NodeID,
+			Failure:          failure,
+		}, nil
+	case "timer-fired":
+		if value.PlanReference != nil || value.Input != nil || value.ExpectedRevision == nil || value.AttemptNumber != nil || value.NextAttemptNumber == nil || value.Output != nil || value.Failure != nil || value.AttemptID != "" || value.EffectID != "" || value.NodeID != "" {
+			return nil, fmt.Errorf("timer-fired event has invalid shape")
+		}
+		return TimerFired{
+			EventID: value.EventID, ExecutionID: value.ExecutionID,
+			ExpectedRevision: *value.ExpectedRevision, TimerID: value.TimerID,
+			ActivationID: value.ActivationID, NextAttemptNumber: *value.NextAttemptNumber,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown execution event %q", value.Type)
@@ -483,17 +622,24 @@ func (value fixtureExecutionEvent) toPublic() (ExecutionEvent, error) {
 }
 
 func (value fixtureExecutionEffect) toPublic() (ExecutionEffect, error) {
-	if value.Type != "execute-node" {
+	switch value.Type {
+	case "execute-node-attempt":
+		input, err := value.Input.toPublic()
+		if err != nil {
+			return nil, err
+		}
+		return ExecuteNodeAttempt{
+			EffectID: value.EffectID, ActivationID: value.ActivationID,
+			AttemptID: value.AttemptID, AttemptNumber: value.AttemptNumber,
+			NodeID: value.NodeID, Input: input,
+		}, nil
+	case "schedule-timer":
+		return ScheduleTimer{
+			EffectID: value.EffectID, TimerID: value.TimerID, ActivationID: value.ActivationID,
+			FailedAttemptID: value.FailedAttemptID, NextAttemptNumber: value.NextAttemptNumber,
+			DelayMs: value.DelayMs,
+		}, nil
+	default:
 		return nil, fmt.Errorf("unknown execution effect %q", value.Type)
 	}
-	input, err := value.Input.toPublic()
-	if err != nil {
-		return nil, err
-	}
-	return ExecuteNode{
-		EffectID:    value.EffectID,
-		ExecutionID: value.ExecutionID,
-		NodeID:      value.NodeID,
-		Input:       input,
-	}, nil
 }

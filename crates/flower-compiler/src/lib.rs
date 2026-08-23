@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use flower_plan::{EdgeId, ExecutableWorkflowPlan, NodeId, NodeKind, PlanNode, WorkflowId};
+use flower_plan::{
+    EdgeId, ExecutableWorkflowPlan, NodeId, NodeKind, PlanNode, RetryPolicy, WorkflowId,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -8,6 +10,8 @@ use serde::{Deserialize, Serialize};
 pub struct NodeDefinition {
     pub id: NodeId,
     pub kind: NodeKind,
+    #[serde(default)]
+    pub retry_policy: Option<RetryPolicy>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -60,6 +64,23 @@ pub fn compile(definition: WorkflowDefinition) -> Result<ExecutableWorkflowPlan,
     let mut nodes = BTreeMap::new();
     for node in definition.nodes {
         let id = node.id.clone();
+        match (&node.kind, &node.retry_policy) {
+            (NodeKind::Activity, Some(policy)) if !policy.validate() => {
+                return error(
+                    "invalid-retry-policy",
+                    format!("activity `{id}` has an invalid retry policy"),
+                    id,
+                );
+            }
+            (NodeKind::Start | NodeKind::Finish, Some(_)) => {
+                return error(
+                    "retry-policy-on-non-activity",
+                    format!("non-activity node `{id}` cannot define a retry policy"),
+                    id,
+                );
+            }
+            _ => {}
+        }
         if nodes.insert(id.clone(), node).is_some() {
             return error("duplicate-node", format!("duplicate node `{id}`"), id);
         }
@@ -140,6 +161,8 @@ pub fn compile(definition: WorkflowDefinition) -> Result<ExecutableWorkflowPlan,
         path.push(PlanNode {
             id: node.id.clone(),
             kind: node.kind,
+            retry_policy: (node.kind == NodeKind::Activity)
+                .then(|| node.retry_policy.clone().unwrap_or_default()),
         });
         if current == finish {
             break;
@@ -211,6 +234,7 @@ mod tests {
         NodeDefinition {
             id: id(value),
             kind,
+            retry_policy: None,
         }
     }
     fn edge(value: &str, source: &str, target: &str) -> EdgeDefinition {

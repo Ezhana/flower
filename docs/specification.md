@@ -37,7 +37,7 @@ YAML 只是后续候选输入格式。Compiler 输出的 `ExecutableWorkflowPlan
 6. 外部副作用的请求与结果 **MUST** 可关联，重放 **MUST NOT** 默认重复执行已确认的副作用；
 7. Binding **MUST NOT** 改变公共 Value、Error 或 State 的含义。
 
-v0.1 已冻结线性成功路径；失败、Attempt、重试与取消条款仍待后续版本补全。
+v0.1 是只读历史规范。v0.2 已冻结线性成功路径、NodeActivation、Attempt、失败终态以及确定性 retry/timer 语义；取消条款仍待后续阶段补全。
 
 ## 3. Conformance suite
 

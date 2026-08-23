@@ -7,7 +7,7 @@ use flower_plan::{
 };
 use serde::{Deserialize, Serialize};
 
-pub const FIXTURE_SCHEMA_VERSION: &str = "flower.conformance/v0.1";
+pub const FIXTURE_SCHEMA_VERSION: &str = "flower.conformance/v0.2";
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -58,7 +58,7 @@ pub struct TransitionStep {
 #[serde(tag = "outcome", rename_all = "kebab-case", deny_unknown_fields)]
 pub enum TransitionExpectation {
     Transition {
-        snapshot: ExecutionSnapshot,
+        snapshot: Box<ExecutionSnapshot>,
         effects: Vec<ExecutionEffect>,
     },
     Error {
@@ -76,7 +76,7 @@ pub struct ExpectedEngineError {
 impl From<Transition> for TransitionExpectation {
     fn from(value: Transition) -> Self {
         Self::Transition {
-            snapshot: value.snapshot,
+            snapshot: Box::new(value.snapshot),
             effects: value.effects,
         }
     }
@@ -92,9 +92,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_v0_1_fixture_executes_its_declared_expectations() {
+    fn every_v0_2_fixture_executes_its_declared_expectations() {
         let specification_directory =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/v0.1");
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/v0.2");
         serde_json::from_slice::<serde_json::Value>(
             &fs::read(specification_directory.join("fixture-schema.json"))
                 .expect("read fixture JSON Schema"),
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn tampering_any_expected_fixture_value_is_detected() {
         let fixture_directory =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/v0.1/fixtures");
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/v0.2/fixtures");
         let mut paths = fs::read_dir(fixture_directory)
             .expect("read fixture directory")
             .map(|entry| entry.expect("read fixture entry").path())
@@ -200,7 +200,7 @@ mod tests {
                             (
                                 Ok(actual),
                                 TransitionExpectation::Transition { snapshot, effects },
-                            ) => actual.snapshot == *snapshot && actual.effects == *effects,
+                            ) => actual.snapshot == **snapshot && actual.effects == *effects,
                             (Err(actual), TransitionExpectation::Error { error }) => {
                                 actual.code() == error.code && actual.to_string() == error.message
                             }
@@ -252,10 +252,25 @@ mod tests {
                 }
             }
             serde_json::Value::Array(items) => {
-                items.push(items.first().cloned().unwrap_or(serde_json::Value::Null));
+                let mut added = items.first().cloned().unwrap_or(serde_json::Value::Null);
+                tamper_json_value(&mut added);
+                items.push(added);
             }
             serde_json::Value::Object(fields) => {
-                fields.insert("__tampered".to_owned(), serde_json::Value::Bool(true));
+                let discriminator_name = if fields.contains_key("type") {
+                    Some("type")
+                } else if fields.contains_key("outcome") {
+                    Some("outcome")
+                } else {
+                    None
+                };
+                if let Some(serde_json::Value::String(discriminator)) =
+                    discriminator_name.and_then(|name| fields.get_mut(name))
+                {
+                    discriminator.push_str("-tampered");
+                } else {
+                    fields.insert("__tampered".to_owned(), serde_json::Value::Bool(true));
+                }
             }
         }
     }

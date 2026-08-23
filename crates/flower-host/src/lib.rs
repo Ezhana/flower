@@ -5,13 +5,147 @@ use flower_kernel::{
     TransitionError, transition, validate_snapshot,
 };
 use flower_plan::{EffectId, EventId, ExecutableWorkflowPlan, ExecutionId, PlanReference};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use std::{collections::BTreeSet, sync::Arc};
 use thiserror::Error;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PendingEffect {
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(transparent)]
+pub struct ClaimId(String);
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(transparent)]
+pub struct DispatcherId(String);
+
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum DispatchIdentityError {
+    #[error("dispatch identity cannot be empty")]
+    Empty,
+    #[error("dispatch identity contains unsupported characters")]
+    UnsupportedCharacters,
+}
+
+macro_rules! dispatch_identity {
+    ($name:ident) => {
+        impl $name {
+            pub fn new(value: impl Into<String>) -> Result<Self, DispatchIdentityError> {
+                let value = value.into();
+                if value.is_empty() {
+                    return Err(DispatchIdentityError::Empty);
+                }
+                if !value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+                {
+                    return Err(DispatchIdentityError::UnsupportedCharacters);
+                }
+                Ok(Self(value))
+            }
+
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: Deserializer<'de>,
+            {
+                Self::new(String::deserialize(deserializer)?).map_err(de::Error::custom)
+            }
+        }
+    };
+}
+
+dispatch_identity!(ClaimId);
+dispatch_identity!(DispatcherId);
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(transparent)]
+pub struct LeaseInstant(pub u64);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LeaseDuration(u64);
+
+impl LeaseDuration {
+    pub fn new(milliseconds: u64) -> Option<Self> {
+        (milliseconds > 0).then_some(Self(milliseconds))
+    }
+
+    pub fn milliseconds(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct EffectClaim {
+    pub claim_id: ClaimId,
+    pub owner_id: DispatcherId,
+    pub lease_until: LeaseInstant,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "state", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum OutboxEffectStatus {
+    Pending,
+    Claimed { claim: EffectClaim },
+    Confirmed,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct OutboxEffect {
     pub effect: ExecutionEffect,
-    pub dispatched: bool,
+    pub status: OutboxEffectStatus,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimedEffect {
+    pub effect: ExecutionEffect,
+    pub claim: EffectClaim,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ClaimPendingEffectsRequest {
+    pub claim_id: ClaimId,
+    pub owner_id: DispatcherId,
+    pub now: LeaseInstant,
+    pub lease_until: LeaseInstant,
+    pub maximum_count: usize,
+}
+
+impl ClaimPendingEffectsRequest {
+    pub fn new(
+        claim_id: ClaimId,
+        owner_id: DispatcherId,
+        now: LeaseInstant,
+        lease_until: LeaseInstant,
+        maximum_count: usize,
+    ) -> Result<Self, InvalidClaimRequest> {
+        if lease_until <= now {
+            return Err(InvalidClaimRequest::NonFutureLease);
+        }
+        if maximum_count == 0 {
+            return Err(InvalidClaimRequest::ZeroMaximumCount);
+        }
+        Ok(Self {
+            claim_id,
+            owner_id,
+            now,
+            lease_until,
+            maximum_count,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
+pub enum InvalidClaimRequest {
+    #[error("claim lease must end after the claim time")]
+    NonFutureLease,
+    #[error("claim maximum count must be non-zero")]
+    ZeroMaximumCount,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -25,7 +159,7 @@ pub struct StoredExecution {
     pub head: ExecutionHead,
     pub snapshot: ExecutionSnapshot,
     pub events: Vec<ExecutionEvent>,
-    pub outbox: Vec<PendingEffect>,
+    pub outbox: Vec<OutboxEffect>,
 }
 
 impl StoredExecution {
@@ -42,6 +176,11 @@ impl StoredExecution {
         let events_are_consistent = self.events.iter().all(|event| {
             event.execution_id() == execution_id && event_ids.insert(event.event_id())
         });
+        let mut effect_ids = BTreeSet::new();
+        let outbox_is_consistent = self
+            .outbox
+            .iter()
+            .all(|entry| effect_ids.insert(entry.effect.effect_id()));
         let event_count = u64::try_from(self.events.len()).ok();
         if self.snapshot.execution_id != *execution_id
             || self.snapshot.plan_reference != self.head.plan_reference
@@ -49,6 +188,7 @@ impl StoredExecution {
             || event_count != Some(self.head.revision.0)
             || !first_event_matches
             || !events_are_consistent
+            || !outbox_is_consistent
         {
             return Err(StoreError::InconsistentExecution {
                 execution_id: execution_id.clone(),
@@ -99,7 +239,9 @@ impl ExecutionCommit {
         }
         match (&event, expected_revision.0) {
             (ExecutionEvent::ExecutionStarted { .. }, 0)
-            | (ExecutionEvent::NodeCompleted { .. }, 1..) => {}
+            | (ExecutionEvent::NodeAttemptSucceeded { .. }, 1..)
+            | (ExecutionEvent::NodeAttemptFailed { .. }, 1..)
+            | (ExecutionEvent::TimerFired { .. }, 1..) => {}
             _ => return Err(CommitError::InvalidEventSequence),
         }
         if let ExecutionEvent::ExecutionStarted { plan_reference, .. } = &event
@@ -170,6 +312,8 @@ pub enum CommitError {
     },
     #[error("event id `{event_id}` is already bound to a different event in this execution")]
     EventIdentityConflict { event_id: EventId },
+    #[error("effect id `{effect_id}` is already bound in the global outbox")]
+    EffectIdentityConflict { effect_id: EffectId },
     #[error("commit execution id does not match transition")]
     ExecutionIdMismatch,
     #[error("commit must advance exactly once from {expected_previous:?}, got {actual:?}")]
@@ -186,11 +330,23 @@ pub enum CommitError {
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
-pub enum ConfirmEffectError {
+pub enum EffectClaimError {
     #[error("execution `{execution_id}` does not exist")]
     ExecutionNotFound { execution_id: ExecutionId },
     #[error("effect `{effect_id}` does not exist in the execution outbox")]
     EffectNotFound { effect_id: EffectId },
+    #[error("effect `{effect_id}` is not currently claimed")]
+    EffectNotClaimed { effect_id: EffectId },
+    #[error("claim identity does not own effect `{effect_id}`")]
+    ClaimIdentityMismatch { effect_id: EffectId },
+    #[error("claim for effect `{effect_id}` expired at {lease_until:?}; current time is {now:?}")]
+    ClaimExpired {
+        effect_id: EffectId,
+        lease_until: LeaseInstant,
+        now: LeaseInstant,
+    },
+    #[error(transparent)]
+    InvalidRequest(#[from] InvalidClaimRequest),
     #[error(transparent)]
     Store(#[from] StoreError),
 }
@@ -199,11 +355,24 @@ pub trait ExecutionStore: Send + Sync {
     async fn load(&self, execution_id: &ExecutionId)
     -> Result<Option<StoredExecution>, StoreError>;
     async fn commit(&self, commit: ExecutionCommit) -> Result<CommitOutcome, CommitError>;
+    async fn claim_pending_effects(
+        &self,
+        execution_id: &ExecutionId,
+        request: &ClaimPendingEffectsRequest,
+    ) -> Result<Vec<ClaimedEffect>, EffectClaimError>;
     async fn confirm_effect_dispatched(
         &self,
         execution_id: &ExecutionId,
         effect_id: &EffectId,
-    ) -> Result<(), ConfirmEffectError>;
+        claim: &EffectClaim,
+        now: LeaseInstant,
+    ) -> Result<(), EffectClaimError>;
+    async fn release_effect_claim(
+        &self,
+        execution_id: &ExecutionId,
+        effect_id: &EffectId,
+        claim: &EffectClaim,
+    ) -> Result<(), EffectClaimError>;
 }
 
 impl<Store: ExecutionStore + ?Sized> ExecutionStore for Arc<Store> {
@@ -216,13 +385,32 @@ impl<Store: ExecutionStore + ?Sized> ExecutionStore for Arc<Store> {
     async fn commit(&self, commit: ExecutionCommit) -> Result<CommitOutcome, CommitError> {
         (**self).commit(commit).await
     }
+    async fn claim_pending_effects(
+        &self,
+        execution_id: &ExecutionId,
+        request: &ClaimPendingEffectsRequest,
+    ) -> Result<Vec<ClaimedEffect>, EffectClaimError> {
+        (**self).claim_pending_effects(execution_id, request).await
+    }
     async fn confirm_effect_dispatched(
         &self,
         execution_id: &ExecutionId,
         effect_id: &EffectId,
-    ) -> Result<(), ConfirmEffectError> {
+        claim: &EffectClaim,
+        now: LeaseInstant,
+    ) -> Result<(), EffectClaimError> {
         (**self)
-            .confirm_effect_dispatched(execution_id, effect_id)
+            .confirm_effect_dispatched(execution_id, effect_id, claim, now)
+            .await
+    }
+    async fn release_effect_claim(
+        &self,
+        execution_id: &ExecutionId,
+        effect_id: &EffectId,
+        claim: &EffectClaim,
+    ) -> Result<(), EffectClaimError> {
+        (**self)
+            .release_effect_claim(execution_id, effect_id, claim)
             .await
     }
 }
@@ -242,13 +430,66 @@ pub enum HostError {
     Commit(#[from] CommitError),
 }
 
-pub struct WorkflowHost<Store> {
-    store: Store,
+pub trait LeaseClock: Send + Sync {
+    fn now(&self) -> LeaseInstant;
 }
 
-impl<Store: ExecutionStore> WorkflowHost<Store> {
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SystemLeaseClock;
+
+impl LeaseClock for SystemLeaseClock {
+    fn now(&self) -> LeaseInstant {
+        let elapsed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
+        LeaseInstant(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX))
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DispatchRequest {
+    pub claim_id: ClaimId,
+    pub owner_id: DispatcherId,
+    pub lease_duration: LeaseDuration,
+    pub maximum_count: usize,
+}
+
+impl DispatchRequest {
+    pub fn new(
+        claim_id: ClaimId,
+        owner_id: DispatcherId,
+        lease_duration: LeaseDuration,
+        maximum_count: usize,
+    ) -> Result<Self, InvalidClaimRequest> {
+        if maximum_count == 0 {
+            return Err(InvalidClaimRequest::ZeroMaximumCount);
+        }
+        Ok(Self {
+            claim_id,
+            owner_id,
+            lease_duration,
+            maximum_count,
+        })
+    }
+}
+
+pub struct WorkflowHost<Store, Clock = SystemLeaseClock> {
+    store: Store,
+    clock: Clock,
+}
+
+impl<Store: ExecutionStore> WorkflowHost<Store, SystemLeaseClock> {
     pub fn new(store: Store) -> Self {
-        Self { store }
+        Self {
+            store,
+            clock: SystemLeaseClock,
+        }
+    }
+}
+
+impl<Store: ExecutionStore, Clock: LeaseClock> WorkflowHost<Store, Clock> {
+    pub fn with_clock(store: Store, clock: Clock) -> Self {
+        Self { store, clock }
     }
     pub fn store(&self) -> &Store {
         &self.store
@@ -292,26 +533,40 @@ impl<Store: ExecutionStore> WorkflowHost<Store> {
     pub async fn dispatch_pending<Dispatcher: EffectDispatcher>(
         &self,
         execution_id: &ExecutionId,
+        request: &DispatchRequest,
         dispatcher: &Dispatcher,
     ) -> Result<(), DispatchError<Dispatcher::Error>> {
-        let Some(stored) = self
+        let now = self.clock.now();
+        let lease_until = LeaseInstant(
+            now.0
+                .checked_add(request.lease_duration.milliseconds())
+                .ok_or(DispatchError::LeaseOverflow)?,
+        );
+        let claim_request = ClaimPendingEffectsRequest::new(
+            request.claim_id.clone(),
+            request.owner_id.clone(),
+            now,
+            lease_until,
+            request.maximum_count,
+        )
+        .map_err(DispatchError::InvalidRequest)?;
+        let claimed = self
             .store
-            .load(execution_id)
+            .claim_pending_effects(execution_id, &claim_request)
             .await
-            .map_err(DispatchError::Store)?
-        else {
-            return Ok(());
-        };
-        stored
-            .validate_consistency(execution_id)
-            .map_err(DispatchError::Store)?;
-        for pending in stored.outbox.iter().filter(|pending| !pending.dispatched) {
+            .map_err(DispatchError::Claim)?;
+        for claimed_effect in claimed {
             dispatcher
-                .dispatch(&pending.effect)
+                .dispatch(&claimed_effect.effect)
                 .await
                 .map_err(DispatchError::Dispatcher)?;
             self.store
-                .confirm_effect_dispatched(execution_id, pending.effect.effect_id())
+                .confirm_effect_dispatched(
+                    execution_id,
+                    claimed_effect.effect.effect_id(),
+                    &claimed_effect.claim,
+                    self.clock.now(),
+                )
                 .await
                 .map_err(DispatchError::Confirm)?;
         }
@@ -323,10 +578,14 @@ impl<Store: ExecutionStore> WorkflowHost<Store> {
 pub enum DispatchError<DispatcherError> {
     #[error("effect dispatcher failed")]
     Dispatcher(DispatcherError),
+    #[error("dispatch lease instant overflowed")]
+    LeaseOverflow,
     #[error(transparent)]
-    Store(StoreError),
+    InvalidRequest(InvalidClaimRequest),
     #[error(transparent)]
-    Confirm(ConfirmEffectError),
+    Claim(EffectClaimError),
+    #[error(transparent)]
+    Confirm(EffectClaimError),
 }
 
 pub fn replay(
@@ -343,9 +602,10 @@ pub fn replay(
         ExecutionEvent::ExecutionStarted { .. } => {
             return Err(TransitionError::PlanReferenceMismatch);
         }
-        ExecutionEvent::NodeCompleted { .. } => {
+        ExecutionEvent::NodeAttemptSucceeded { .. } | ExecutionEvent::NodeAttemptFailed { .. } => {
             return Err(TransitionError::ExecutionNotStarted);
         }
+        ExecutionEvent::TimerFired { .. } => return Err(TransitionError::ExecutionNotStarted),
     }
 
     let mut snapshot = Some(transition(plan, None, first_event)?.snapshot);

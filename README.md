@@ -1,6 +1,6 @@
 # Flower
 
-Flower 是语言无关、可持久化、可重放的工作流执行规范及 Rust 参考实现。当前 v0.1 内核只支持一条确定的 `start -> activity* -> finish` 路径；gateway、edge condition、失败、重试、取消与超时尚未进入规范。
+Flower 是语言无关、可持久化、可重放的工作流执行规范及 Rust 参考实现。当前 v0.2 内核支持确定的 `start -> activity* -> finish` 路径、显式 NodeActivation/Attempt，以及由 Plan 决定、由 Host timer 边界驱动的确定性重试；gateway、edge condition、取消与超时尚未进入规范。
 
 ## 架构
 
@@ -14,33 +14,41 @@ ExecutableWorkflowPlan
 flower-kernel ── snapshot + event -> snapshot + effects
        │
 flower-host ── atomic commit + outbox
-       │
-flower-store-memory
+       ├── flower-store-memory
+       └── flower-store-postgres
 ```
 
 - `flower-plan` 只包含强类型身份、规范版本和不可变执行计划；
 - `flower-compiler` 是定义进入 runtime 的唯一入口；
 - `flower-kernel` 是无 I/O、无随机数、无 async runtime 的纯确定性函数；
 - `flower-host` 协调 snapshot、事件和 Effect intent 的原子提交；
+- `flower-store-memory` 与 `flower-store-postgres` 实现相同的 optimistic commit 和 outbox claim/lease contract；
 - `flower-component` 是 WIT 转换层，不保存 execution，也不导入 WASI；
 - Go SDK 公开惯用类型，把生成的 WIT ABI 与 Component runtime 隔离在 `internal/componentabi`。
 
-完整边界见 [架构说明](docs/architecture.md)，v0.1 行为见 [语义规范](spec/v0.1/semantics.md)。
+完整边界见 [架构说明](docs/architecture.md)，v0.2 行为见 [语义规范](spec/v0.2/semantics.md)。
 
 ## 核心语义
 
 ```text
 None + ExecutionStarted
-  -> AwaitingNode(first activity) + ExecuteNode
+  -> AwaitingAttempt(first activation, attempt 1) + ExecuteNodeAttempt
 
-AwaitingNode + matching NodeCompleted
-  -> AwaitingNode(next activity) + ExecuteNode
+AwaitingAttempt + matching NodeAttemptSucceeded
+  -> AwaitingAttempt(next activation, attempt 1) + ExecuteNodeAttempt
   -> or Completed + no effects
+
+AwaitingAttempt + matching NodeAttemptFailed
+  -> Failed + no effects
+  -> or WaitingForRetry + ScheduleTimer
+
+WaitingForRetry + matching TimerFired
+  -> AwaitingAttempt(same activation, new attempt) + ExecuteNodeAttempt
 ```
 
-Payload 是不透明的 `{ media_type, bytes }`。Kernel 不解析 JSON。`ExecutionId` 与 `EffectId` 全局唯一，`EventId` 在单个 Execution 内唯一；`ExecutionStarted`、snapshot 与 store head 绑定同一个不可变 `PlanReference`。Effect ID 使用规范定义的域分隔、长度前缀 SHA-256 编码确定性推导，Kernel 不生成随机数。
+Payload 是不透明的 `{ media_type, bytes }`。Kernel 不解析 JSON，也不读取时钟。Retry policy 固化在 Plan 中；Kernel 只计算整数 `delay_ms`，Host 负责持久化和投递 timer。`ExecutionId` 与 `EffectId` 全局唯一，`EventId` 在单个 Execution 内唯一；`ExecutionStarted`、snapshot 与 store head 绑定同一个不可变 `PlanReference`。Effect ID 使用规范定义的域分隔、长度前缀 SHA-256 编码确定性推导，Kernel 不生成随机数。
 
-共享 fixture 位于 `spec/v0.1/fixtures`，格式由 `spec/v0.1/fixture-schema.json` 固定。Rust 与 Go Component runner 逐项比较完整 plan、diagnostics、snapshot、effects 和 error。
+共享 fixture 位于 `spec/v0.2/fixtures`，格式由 `spec/v0.2/fixture-schema.json` 固定。Rust 与 Go Component runner 逐项比较完整 plan、diagnostics、snapshot、effects 和 error。
 
 ## 验证
 
@@ -51,6 +59,8 @@ scripts/verify.sh
 ```
 
 脚本执行格式、Clippy、Rust tests、Component 构建/验证、无 WASI import 检查和 Go conformance tests。Component 构建使用仓库内的 `flower-component-tools`，不依赖全局安装 `wasm-tools`。
+
+PostgreSQL schema 位于 `crates/flower-store-postgres/migrations`。应用启动时可调用 `PostgresExecutionStore::migrate`；数据库连接及其 connection driver 的生命周期由 Host 应用负责。
 
 ## 文档
 

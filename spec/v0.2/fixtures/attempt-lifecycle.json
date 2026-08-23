@@ -1,0 +1,971 @@
+{
+  "schema_version": "flower.conformance/v0.2",
+  "name": "attempt-lifecycle",
+  "definition": {
+    "id": "attempt-lifecycle",
+    "nodes": [
+      {
+        "id": "start",
+        "kind": "start",
+        "retry_policy": null
+      },
+      {
+        "id": "work",
+        "kind": "activity",
+        "retry_policy": null
+      },
+      {
+        "id": "finish",
+        "kind": "finish",
+        "retry_policy": null
+      }
+    ],
+    "edges": [
+      {
+        "id": "start-work",
+        "source": "start",
+        "target": "work"
+      },
+      {
+        "id": "work-finish",
+        "source": "work",
+        "target": "finish"
+      }
+    ]
+  },
+  "expected_compile": {
+    "outcome": "plan",
+    "plan": {
+      "specification_version": {
+        "major": 0,
+        "minor": 2
+      },
+      "workflow_id": "attempt-lifecycle",
+      "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052",
+      "nodes": [
+        {
+          "id": "start",
+          "kind": "start",
+          "retry_policy": null
+        },
+        {
+          "id": "work",
+          "kind": "activity",
+          "retry_policy": {
+            "max_attempts": 1,
+            "retryable_failure_codes": [],
+            "backoff": {
+              "type": "none"
+            }
+          }
+        },
+        {
+          "id": "finish",
+          "kind": "finish",
+          "retry_policy": null
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "snapshot": null,
+      "event": {
+        "type": "execution-started",
+        "event_id": "event-started",
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "input": {
+          "media_type": "text/plain",
+          "bytes": [
+            105,
+            110,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "execution",
+          "plan_reference": {
+            "specification_version": {
+              "major": 0,
+              "minor": 2
+            },
+            "workflow_id": "attempt-lifecycle",
+            "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+          },
+          "revision": 1,
+          "state": {
+            "type": "awaiting-attempt",
+            "activation": {
+              "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+              "activation_revision": 1,
+              "node_id": "work",
+              "input": {
+                "media_type": "text/plain",
+                "bytes": [
+                  105,
+                  110,
+                  112,
+                  117,
+                  116
+                ]
+              }
+            },
+            "attempt": {
+              "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+              "attempt_number": 1,
+              "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+            }
+          }
+        },
+        "effects": [
+          {
+            "type": "execute-node-attempt",
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-succeeded",
+        "event_id": "event-succeeded",
+        "execution_id": "execution",
+        "expected_revision": 1,
+        "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+        "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+        "attempt_number": 1,
+        "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+        "node_id": "work",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "execution",
+          "plan_reference": {
+            "specification_version": {
+              "major": 0,
+              "minor": 2
+            },
+            "workflow_id": "attempt-lifecycle",
+            "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+          },
+          "revision": 2,
+          "state": {
+            "type": "completed",
+            "output": {
+              "media_type": "text/plain",
+              "bytes": [
+                111,
+                117,
+                116,
+                112,
+                117,
+                116
+              ]
+            }
+          }
+        },
+        "effects": []
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-failed",
+        "event_id": "event-failed",
+        "execution_id": "execution",
+        "expected_revision": 1,
+        "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+        "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+        "attempt_number": 1,
+        "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+        "node_id": "work",
+        "failure": {
+          "code": "worker.failed",
+          "details": {
+            "media_type": "text/plain",
+            "bytes": [
+              100,
+              101,
+              116,
+              97,
+              105,
+              108,
+              115
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "execution",
+          "plan_reference": {
+            "specification_version": {
+              "major": 0,
+              "minor": 2
+            },
+            "workflow_id": "attempt-lifecycle",
+            "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+          },
+          "revision": 2,
+          "state": {
+            "type": "failed",
+            "activation": {
+              "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+              "activation_revision": 1,
+              "node_id": "work",
+              "input": {
+                "media_type": "text/plain",
+                "bytes": [
+                  105,
+                  110,
+                  112,
+                  117,
+                  116
+                ]
+              }
+            },
+            "attempt": {
+              "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+              "attempt_number": 1,
+              "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+            },
+            "failure": {
+              "code": "worker.failed",
+              "details": {
+                "media_type": "text/plain",
+                "bytes": [
+                  100,
+                  101,
+                  116,
+                  97,
+                  105,
+                  108,
+                  115
+                ]
+              }
+            }
+          }
+        },
+        "effects": []
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-succeeded",
+        "event_id": "event-succeeded",
+        "execution_id": "wrong-execution",
+        "expected_revision": 1,
+        "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+        "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+        "attempt_number": 1,
+        "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+        "node_id": "work",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "execution-id-mismatch",
+          "message": "event execution id does not match snapshot"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-succeeded",
+        "event_id": "event-succeeded",
+        "execution_id": "execution",
+        "expected_revision": 0,
+        "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+        "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+        "attempt_number": 1,
+        "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+        "node_id": "work",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "stale-revision",
+          "message": "event expects revision ExecutionRevision(0), but snapshot is ExecutionRevision(1)"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-succeeded",
+        "event_id": "event-succeeded",
+        "execution_id": "execution",
+        "expected_revision": 1,
+        "activation_id": "wrong-activation",
+        "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+        "attempt_number": 1,
+        "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+        "node_id": "work",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "activation-mismatch",
+          "message": "attempt result does not match pending activation"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-succeeded",
+        "event_id": "event-succeeded",
+        "execution_id": "execution",
+        "expected_revision": 1,
+        "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+        "attempt_id": "wrong-attempt",
+        "attempt_number": 1,
+        "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+        "node_id": "work",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "attempt-mismatch",
+          "message": "attempt result does not match pending attempt"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-succeeded",
+        "event_id": "event-succeeded",
+        "execution_id": "execution",
+        "expected_revision": 1,
+        "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+        "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+        "attempt_number": 2,
+        "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+        "node_id": "work",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "attempt-number-mismatch",
+          "message": "attempt result number does not match pending attempt"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-succeeded",
+        "event_id": "event-succeeded",
+        "execution_id": "execution",
+        "expected_revision": 1,
+        "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+        "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+        "attempt_number": 1,
+        "effect_id": "wrong-effect",
+        "node_id": "work",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "effect-mismatch",
+          "message": "attempt result does not match pending effect"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-succeeded",
+        "event_id": "event-succeeded",
+        "execution_id": "execution",
+        "expected_revision": 1,
+        "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+        "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+        "attempt_number": 1,
+        "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+        "node_id": "wrong-node",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "node-mismatch",
+          "message": "attempt result does not match pending node"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 2,
+        "state": {
+          "type": "failed",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          },
+          "failure": {
+            "code": "worker.failed",
+            "details": {
+              "media_type": "text/plain",
+              "bytes": [
+                100,
+                101,
+                116,
+                97,
+                105,
+                108,
+                115
+              ]
+            }
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-succeeded",
+        "event_id": "event-succeeded",
+        "execution_id": "execution",
+        "expected_revision": 2,
+        "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+        "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+        "attempt_number": 1,
+        "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+        "node_id": "work",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "execution-already-terminal",
+          "message": "terminal execution cannot accept events"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 2
+          },
+          "workflow_id": "attempt-lifecycle",
+          "fingerprint": "6fbbbdd3a856a21effa5023e81931e84d4ea61f54e9cb8170d93f1d452039052"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "forged-attempt",
+            "attempt_number": 1,
+            "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-succeeded",
+        "event_id": "event-succeeded",
+        "execution_id": "execution",
+        "expected_revision": 1,
+        "activation_id": "activation-0239961b256cdef6e3b3170a6dd6bd82ee4e09c94d04cf205d3a087a7af295a3",
+        "attempt_id": "attempt-1b215169c3fa26d90328dda6d155fcda8b23633b932c9a5b508d49e59898878c",
+        "attempt_number": 1,
+        "effect_id": "effect-86de4f29c73a686283958d018c2a7a36cf7bda71b5044760f1fdbe0d6498721a",
+        "node_id": "work",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "invalid-snapshot",
+          "message": "snapshot is not a legal state for this plan"
+        }
+      }
+    }
+  ]
+}

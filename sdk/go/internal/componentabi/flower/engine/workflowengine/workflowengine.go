@@ -9,7 +9,7 @@ import (
 
 // InterfaceName is the canonical WIT id of the interface this binding
 // was generated from.
-const InterfaceName = "flower:engine/workflow-engine@0.1.0"
+const InterfaceName = "flower:engine/workflow-engine@0.2.0"
 
 // WorkflowEngine is the Go binding for the flower:engine/workflow-engine interface.
 // Implement it to provide a host-side component, or pass an exported wasm
@@ -56,6 +56,34 @@ func NoneExecutionSnapshot() OptionExecutionSnapshot {
 	return OptionExecutionSnapshot{}
 }
 
+// OptionPayload corresponds to a WIT option<...> type.
+type OptionPayload struct {
+	IsSome bool
+	Value  Payload
+}
+
+func SomePayload(v Payload) OptionPayload {
+	return OptionPayload{IsSome: true, Value: v}
+}
+
+func NonePayload() OptionPayload {
+	return OptionPayload{}
+}
+
+// OptionRetryPolicy corresponds to a WIT option<...> type.
+type OptionRetryPolicy struct {
+	IsSome bool
+	Value  RetryPolicy
+}
+
+func SomeRetryPolicy(v RetryPolicy) OptionRetryPolicy {
+	return OptionRetryPolicy{IsSome: true, Value: v}
+}
+
+func NoneRetryPolicy() OptionRetryPolicy {
+	return OptionRetryPolicy{}
+}
+
 // OptionString corresponds to a WIT option<...> type.
 type OptionString struct {
 	IsSome bool
@@ -92,10 +120,30 @@ type SpecificationVersion struct {
 	Minor uint16
 }
 
+// FixedBackoff corresponds to the WIT record fixed-backoff.
+type FixedBackoff struct {
+	DelayMs uint64
+}
+
+// ExponentialBackoff corresponds to the WIT record exponential-backoff.
+type ExponentialBackoff struct {
+	InitialDelayMs uint64
+	Multiplier     uint32
+	MaximumDelayMs uint64
+}
+
+// RetryPolicy corresponds to the WIT record retry-policy.
+type RetryPolicy struct {
+	MaxAttempts           uint32
+	RetryableFailureCodes []string
+	Backoff               BackoffPolicy
+}
+
 // NodeDefinition corresponds to the WIT record node-definition.
 type NodeDefinition struct {
-	ID   string
-	Kind NodeKind
+	ID          string
+	Kind        NodeKind
+	RetryPolicy OptionRetryPolicy
 }
 
 // EdgeDefinition corresponds to the WIT record edge-definition.
@@ -121,8 +169,9 @@ type Diagnostic struct {
 
 // PlanNode corresponds to the WIT record plan-node.
 type PlanNode struct {
-	ID   string
-	Kind NodeKind
+	ID          string
+	Kind        NodeKind
+	RetryPolicy OptionRetryPolicy
 }
 
 // ExecutableWorkflowPlan corresponds to the WIT record executable-workflow-plan.
@@ -146,11 +195,55 @@ type Payload struct {
 	Bytes     []uint8
 }
 
-// AwaitingNode corresponds to the WIT record awaiting-node.
-type AwaitingNode struct {
-	NodeID   string
-	EffectID string
-	Input    Payload
+// NodeActivation corresponds to the WIT record node-activation.
+type NodeActivation struct {
+	ActivationID       string
+	ActivationRevision uint64
+	NodeID             string
+	Input              Payload
+}
+
+// NodeAttempt corresponds to the WIT record node-attempt.
+type NodeAttempt struct {
+	AttemptID     string
+	AttemptNumber uint32
+	EffectID      string
+}
+
+// AttemptFailure corresponds to the WIT record attempt-failure.
+type AttemptFailure struct {
+	Code    string
+	Details OptionPayload
+}
+
+// RetryTimer corresponds to the WIT record retry-timer.
+type RetryTimer struct {
+	TimerID           string
+	EffectID          string
+	FailedAttemptID   string
+	NextAttemptNumber uint32
+	DelayMs           uint64
+}
+
+// AwaitingAttempt corresponds to the WIT record awaiting-attempt.
+type AwaitingAttempt struct {
+	Activation NodeActivation
+	Attempt    NodeAttempt
+}
+
+// WaitingForRetry corresponds to the WIT record waiting-for-retry.
+type WaitingForRetry struct {
+	Activation NodeActivation
+	Attempt    NodeAttempt
+	Failure    AttemptFailure
+	Timer      RetryTimer
+}
+
+// FailedExecution corresponds to the WIT record failed-execution.
+type FailedExecution struct {
+	Activation NodeActivation
+	Attempt    NodeAttempt
+	Failure    AttemptFailure
 }
 
 // ExecutionSnapshot corresponds to the WIT record execution-snapshot.
@@ -169,22 +262,60 @@ type ExecutionStartedEvent struct {
 	Input         Payload
 }
 
-// NodeCompletedEvent corresponds to the WIT record node-completed-event.
-type NodeCompletedEvent struct {
+// NodeAttemptSucceededEvent corresponds to the WIT record node-attempt-succeeded-event.
+type NodeAttemptSucceededEvent struct {
 	EventID          string
 	ExecutionID      string
 	ExpectedRevision uint64
+	ActivationID     string
+	AttemptID        string
+	AttemptNumber    uint32
 	EffectID         string
 	NodeID           string
 	Output           Payload
 }
 
-// ExecuteNodeEffect corresponds to the WIT record execute-node-effect.
-type ExecuteNodeEffect struct {
-	EffectID    string
-	ExecutionID string
-	NodeID      string
-	Input       Payload
+// NodeAttemptFailedEvent corresponds to the WIT record node-attempt-failed-event.
+type NodeAttemptFailedEvent struct {
+	EventID          string
+	ExecutionID      string
+	ExpectedRevision uint64
+	ActivationID     string
+	AttemptID        string
+	AttemptNumber    uint32
+	EffectID         string
+	NodeID           string
+	Failure          AttemptFailure
+}
+
+// TimerFiredEvent corresponds to the WIT record timer-fired-event.
+type TimerFiredEvent struct {
+	EventID           string
+	ExecutionID       string
+	ExpectedRevision  uint64
+	TimerID           string
+	ActivationID      string
+	NextAttemptNumber uint32
+}
+
+// ExecuteNodeAttemptEffect corresponds to the WIT record execute-node-attempt-effect.
+type ExecuteNodeAttemptEffect struct {
+	EffectID      string
+	ActivationID  string
+	AttemptID     string
+	AttemptNumber uint32
+	NodeID        string
+	Input         Payload
+}
+
+// ScheduleTimerEffect corresponds to the WIT record schedule-timer-effect.
+type ScheduleTimerEffect struct {
+	EffectID          string
+	TimerID           string
+	ActivationID      string
+	FailedAttemptID   string
+	NextAttemptNumber uint32
+	DelayMs           uint64
 }
 
 // TransitionResult corresponds to the WIT record transition-result.
@@ -199,16 +330,47 @@ type EngineError struct {
 	Message string
 }
 
+// BackoffPolicy corresponds to the WIT variant backoff-policy. Sealed:
+// only the case structs below satisfy this interface.
+type BackoffPolicy interface{ isBackoffPolicy() }
+
+// BackoffPolicyNone is the "none" case of BackoffPolicy.
+type BackoffPolicyNone struct {
+}
+
+func (BackoffPolicyNone) isBackoffPolicy() {}
+
+// BackoffPolicyFixed is the "fixed" case of BackoffPolicy.
+type BackoffPolicyFixed struct {
+	Value FixedBackoff
+}
+
+func (BackoffPolicyFixed) isBackoffPolicy() {}
+
+// BackoffPolicyExponential is the "exponential" case of BackoffPolicy.
+type BackoffPolicyExponential struct {
+	Value ExponentialBackoff
+}
+
+func (BackoffPolicyExponential) isBackoffPolicy() {}
+
 // ExecutionState corresponds to the WIT variant execution-state. Sealed:
 // only the case structs below satisfy this interface.
 type ExecutionState interface{ isExecutionState() }
 
-// ExecutionStateAwaitingNode is the "awaiting-node" case of ExecutionState.
-type ExecutionStateAwaitingNode struct {
-	Value AwaitingNode
+// ExecutionStateAwaitingAttempt is the "awaiting-attempt" case of ExecutionState.
+type ExecutionStateAwaitingAttempt struct {
+	Value AwaitingAttempt
 }
 
-func (ExecutionStateAwaitingNode) isExecutionState() {}
+func (ExecutionStateAwaitingAttempt) isExecutionState() {}
+
+// ExecutionStateWaitingForRetry is the "waiting-for-retry" case of ExecutionState.
+type ExecutionStateWaitingForRetry struct {
+	Value WaitingForRetry
+}
+
+func (ExecutionStateWaitingForRetry) isExecutionState() {}
 
 // ExecutionStateCompleted is the "completed" case of ExecutionState.
 type ExecutionStateCompleted struct {
@@ -216,6 +378,13 @@ type ExecutionStateCompleted struct {
 }
 
 func (ExecutionStateCompleted) isExecutionState() {}
+
+// ExecutionStateFailed is the "failed" case of ExecutionState.
+type ExecutionStateFailed struct {
+	Value FailedExecution
+}
+
+func (ExecutionStateFailed) isExecutionState() {}
 
 // ExecutionEvent corresponds to the WIT variant execution-event. Sealed:
 // only the case structs below satisfy this interface.
@@ -228,20 +397,41 @@ type ExecutionEventExecutionStarted struct {
 
 func (ExecutionEventExecutionStarted) isExecutionEvent() {}
 
-// ExecutionEventNodeCompleted is the "node-completed" case of ExecutionEvent.
-type ExecutionEventNodeCompleted struct {
-	Value NodeCompletedEvent
+// ExecutionEventNodeAttemptSucceeded is the "node-attempt-succeeded" case of ExecutionEvent.
+type ExecutionEventNodeAttemptSucceeded struct {
+	Value NodeAttemptSucceededEvent
 }
 
-func (ExecutionEventNodeCompleted) isExecutionEvent() {}
+func (ExecutionEventNodeAttemptSucceeded) isExecutionEvent() {}
+
+// ExecutionEventNodeAttemptFailed is the "node-attempt-failed" case of ExecutionEvent.
+type ExecutionEventNodeAttemptFailed struct {
+	Value NodeAttemptFailedEvent
+}
+
+func (ExecutionEventNodeAttemptFailed) isExecutionEvent() {}
+
+// ExecutionEventTimerFired is the "timer-fired" case of ExecutionEvent.
+type ExecutionEventTimerFired struct {
+	Value TimerFiredEvent
+}
+
+func (ExecutionEventTimerFired) isExecutionEvent() {}
 
 // ExecutionEffect corresponds to the WIT variant execution-effect. Sealed:
 // only the case structs below satisfy this interface.
 type ExecutionEffect interface{ isExecutionEffect() }
 
-// ExecutionEffectExecuteNode is the "execute-node" case of ExecutionEffect.
-type ExecutionEffectExecuteNode struct {
-	Value ExecuteNodeEffect
+// ExecutionEffectExecuteNodeAttempt is the "execute-node-attempt" case of ExecutionEffect.
+type ExecutionEffectExecuteNodeAttempt struct {
+	Value ExecuteNodeAttemptEffect
 }
 
-func (ExecutionEffectExecuteNode) isExecutionEffect() {}
+func (ExecutionEffectExecuteNodeAttempt) isExecutionEffect() {}
+
+// ExecutionEffectScheduleTimer is the "schedule-timer" case of ExecutionEffect.
+type ExecutionEffectScheduleTimer struct {
+	Value ScheduleTimerEffect
+}
+
+func (ExecutionEffectScheduleTimer) isExecutionEffect() {}

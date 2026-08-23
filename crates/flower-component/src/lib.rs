@@ -3,23 +3,29 @@ use flower_compiler::{
     WorkflowDefinition as DomainDefinition, compile,
 };
 use flower_kernel::{
+    AttemptFailure as DomainFailure, AttemptNumber as DomainAttemptNumber,
     ExecutionEffect as DomainEffect, ExecutionEvent as DomainEvent, ExecutionRevision,
-    ExecutionSnapshot as DomainSnapshot, ExecutionState as DomainState, Payload as DomainPayload,
-    Transition as DomainTransition, transition,
+    ExecutionSnapshot as DomainSnapshot, ExecutionState as DomainState,
+    NodeActivation as DomainActivation, NodeAttempt as DomainAttempt, Payload as DomainPayload,
+    RetryTimer as DomainRetryTimer, Transition as DomainTransition, transition,
 };
 use flower_plan::{
-    EdgeId, EffectId, EventId, ExecutableWorkflowPlan as DomainPlan, ExecutionId, NodeId,
+    AttemptId, BackoffPolicy as DomainBackoff, EdgeId, EffectId, EventId,
+    ExecutableWorkflowPlan as DomainPlan, ExecutionId, FailureCode, NodeActivationId, NodeId,
     NodeKind as DomainNodeKind, PlanFingerprint, PlanReference as DomainPlanReference,
-    SpecificationVersion as DomainVersion, WorkflowId,
+    RetryPolicy as DomainRetryPolicy, SpecificationVersion as DomainVersion, TimerId, WorkflowId,
 };
 
 wit_bindgen::generate!({ path: "../../wits/engine.wit", world: "engine" });
 
 use exports::flower::engine::workflow_engine::{
-    AwaitingNode, Diagnostic, EdgeDefinition, EngineError, ExecutableWorkflowPlan,
-    ExecuteNodeEffect, ExecutionEffect, ExecutionEvent, ExecutionSnapshot, ExecutionStartedEvent,
-    ExecutionState, Guest, NodeCompletedEvent, NodeDefinition, NodeKind, Payload, PlanNode,
-    PlanReference, SpecificationVersion, TransitionResult, WorkflowDefinition,
+    AttemptFailure, AwaitingAttempt, BackoffPolicy, Diagnostic, EdgeDefinition, EngineError,
+    ExecutableWorkflowPlan, ExecuteNodeAttemptEffect, ExecutionEffect, ExecutionEvent,
+    ExecutionSnapshot, ExecutionStartedEvent, ExecutionState, ExponentialBackoff, FailedExecution,
+    FixedBackoff, Guest, NodeActivation, NodeAttempt, NodeAttemptFailedEvent,
+    NodeAttemptSucceededEvent, NodeDefinition, NodeKind, Payload, PlanNode, PlanReference,
+    RetryPolicy, RetryTimer, ScheduleTimerEffect, SpecificationVersion, TimerFiredEvent,
+    TransitionResult, WaitingForRetry, WorkflowDefinition,
 };
 
 struct FlowerWorkflowEngine;
@@ -88,6 +94,17 @@ impl NodeDefinition {
         Ok(DomainNode {
             id: NodeId::new(self.id).map_err(identifier_diagnostic)?,
             kind: self.kind.into_domain(),
+            retry_policy: self
+                .retry_policy
+                .map(RetryPolicy::try_into_domain)
+                .transpose()
+                .map_err(|error| {
+                    vec![DomainDiagnostic {
+                        code: "invalid-retry-policy".to_owned(),
+                        message: error.to_string(),
+                        subject: None,
+                    }]
+                })?,
         })
     }
 }
@@ -119,6 +136,75 @@ impl NodeKind {
     }
 }
 
+impl RetryPolicy {
+    fn try_into_domain(self) -> Result<DomainRetryPolicy, EngineError> {
+        let retryable_failure_codes = self
+            .retryable_failure_codes
+            .into_iter()
+            .map(|code| {
+                FailureCode::new(code).map_err(|error| engine_error("invalid-failure-code", error))
+            })
+            .collect::<Result<_, _>>()?;
+        let policy = DomainRetryPolicy {
+            max_attempts: self.max_attempts,
+            retryable_failure_codes,
+            backoff: self.backoff.into_domain(),
+        };
+        policy.validate().then_some(policy).ok_or_else(|| {
+            engine_error(
+                "invalid-retry-policy",
+                "retry policy violates its numeric invariants",
+            )
+        })
+    }
+
+    fn from_domain(value: DomainRetryPolicy) -> Self {
+        Self {
+            max_attempts: value.max_attempts,
+            retryable_failure_codes: value
+                .retryable_failure_codes
+                .into_iter()
+                .map(|code| code.to_string())
+                .collect(),
+            backoff: BackoffPolicy::from_domain(value.backoff),
+        }
+    }
+}
+
+impl BackoffPolicy {
+    fn into_domain(self) -> DomainBackoff {
+        match self {
+            Self::None => DomainBackoff::None,
+            Self::Fixed(FixedBackoff { delay_ms }) => DomainBackoff::Fixed { delay_ms },
+            Self::Exponential(ExponentialBackoff {
+                initial_delay_ms,
+                multiplier,
+                maximum_delay_ms,
+            }) => DomainBackoff::Exponential {
+                initial_delay_ms,
+                multiplier,
+                maximum_delay_ms,
+            },
+        }
+    }
+
+    fn from_domain(value: DomainBackoff) -> Self {
+        match value {
+            DomainBackoff::None => Self::None,
+            DomainBackoff::Fixed { delay_ms } => Self::Fixed(FixedBackoff { delay_ms }),
+            DomainBackoff::Exponential {
+                initial_delay_ms,
+                multiplier,
+                maximum_delay_ms,
+            } => Self::Exponential(ExponentialBackoff {
+                initial_delay_ms,
+                multiplier,
+                maximum_delay_ms,
+            }),
+        }
+    }
+}
+
 impl ExecutableWorkflowPlan {
     fn from_domain(plan: DomainPlan) -> Self {
         Self {
@@ -131,13 +217,14 @@ impl ExecutableWorkflowPlan {
                 .map(|node| PlanNode {
                     id: node.id.to_string(),
                     kind: NodeKind::from_domain(node.kind),
+                    retry_policy: node.retry_policy.clone().map(RetryPolicy::from_domain),
                 })
                 .collect(),
         }
     }
 
     fn try_into_domain(self) -> Result<DomainPlan, EngineError> {
-        if self.specification_version.try_into_domain()? != DomainVersion::V0_1 {
+        if self.specification_version.try_into_domain()? != DomainVersion::V0_2 {
             return Err(engine_error(
                 "unsupported-specification-version",
                 "unsupported plan specification version",
@@ -155,6 +242,10 @@ impl ExecutableWorkflowPlan {
                     id: NodeId::new(node.id)
                         .map_err(|error| engine_error("invalid-node-id", error))?,
                     kind: node.kind.into_domain(),
+                    retry_policy: node
+                        .retry_policy
+                        .map(RetryPolicy::try_into_domain)
+                        .transpose()?,
                 })
             })
             .collect::<Result<Vec<_>, EngineError>>()?;
@@ -274,30 +365,137 @@ impl PlanReference {
 impl ExecutionState {
     fn try_into_domain(self) -> Result<DomainState, EngineError> {
         match self {
-            Self::AwaitingNode(value) => Ok(DomainState::AwaitingNode {
-                node_id: NodeId::new(value.node_id)
-                    .map_err(|error| engine_error("invalid-node-id", error))?,
-                effect_id: EffectId::new(value.effect_id)
-                    .map_err(|error| engine_error("invalid-effect-id", error))?,
-                input: value.input.into_domain(),
+            Self::AwaitingAttempt(value) => Ok(DomainState::AwaitingAttempt {
+                activation: value.activation.try_into_domain()?,
+                attempt: value.attempt.try_into_domain()?,
+            }),
+            Self::WaitingForRetry(value) => Ok(DomainState::WaitingForRetry {
+                activation: value.activation.try_into_domain()?,
+                attempt: value.attempt.try_into_domain()?,
+                failure: value.failure.try_into_domain()?,
+                timer: value.timer.try_into_domain()?,
             }),
             Self::Completed(value) => Ok(DomainState::Completed {
                 output: value.into_domain(),
+            }),
+            Self::Failed(value) => Ok(DomainState::Failed {
+                activation: value.activation.try_into_domain()?,
+                attempt: value.attempt.try_into_domain()?,
+                failure: value.failure.try_into_domain()?,
             }),
         }
     }
     fn from_domain(value: DomainState) -> Self {
         match value {
-            DomainState::AwaitingNode {
-                node_id,
-                effect_id,
-                input,
-            } => Self::AwaitingNode(AwaitingNode {
-                node_id: node_id.to_string(),
-                effect_id: effect_id.to_string(),
-                input: Payload::from_domain(input),
+            DomainState::AwaitingAttempt {
+                activation,
+                attempt,
+            } => Self::AwaitingAttempt(AwaitingAttempt {
+                activation: NodeActivation::from_domain(activation),
+                attempt: NodeAttempt::from_domain(attempt),
+            }),
+            DomainState::WaitingForRetry {
+                activation,
+                attempt,
+                failure,
+                timer,
+            } => Self::WaitingForRetry(WaitingForRetry {
+                activation: NodeActivation::from_domain(activation),
+                attempt: NodeAttempt::from_domain(attempt),
+                failure: AttemptFailure::from_domain(failure),
+                timer: RetryTimer::from_domain(timer),
             }),
             DomainState::Completed { output } => Self::Completed(Payload::from_domain(output)),
+            DomainState::Failed {
+                activation,
+                attempt,
+                failure,
+            } => Self::Failed(FailedExecution {
+                activation: NodeActivation::from_domain(activation),
+                attempt: NodeAttempt::from_domain(attempt),
+                failure: AttemptFailure::from_domain(failure),
+            }),
+        }
+    }
+}
+
+impl NodeActivation {
+    fn try_into_domain(self) -> Result<DomainActivation, EngineError> {
+        Ok(DomainActivation {
+            activation_id: NodeActivationId::new(self.activation_id)
+                .map_err(|error| engine_error("invalid-activation-id", error))?,
+            activation_revision: ExecutionRevision(self.activation_revision),
+            node_id: NodeId::new(self.node_id)
+                .map_err(|error| engine_error("invalid-node-id", error))?,
+            input: self.input.into_domain(),
+        })
+    }
+    fn from_domain(value: DomainActivation) -> Self {
+        Self {
+            activation_id: value.activation_id.to_string(),
+            activation_revision: value.activation_revision.0,
+            node_id: value.node_id.to_string(),
+            input: Payload::from_domain(value.input),
+        }
+    }
+}
+
+impl NodeAttempt {
+    fn try_into_domain(self) -> Result<DomainAttempt, EngineError> {
+        Ok(DomainAttempt {
+            attempt_id: AttemptId::new(self.attempt_id)
+                .map_err(|error| engine_error("invalid-attempt-id", error))?,
+            attempt_number: parse_attempt_number(self.attempt_number)?,
+            effect_id: EffectId::new(self.effect_id)
+                .map_err(|error| engine_error("invalid-effect-id", error))?,
+        })
+    }
+    fn from_domain(value: DomainAttempt) -> Self {
+        Self {
+            attempt_id: value.attempt_id.to_string(),
+            attempt_number: value.attempt_number.value(),
+            effect_id: value.effect_id.to_string(),
+        }
+    }
+}
+
+impl AttemptFailure {
+    fn try_into_domain(self) -> Result<DomainFailure, EngineError> {
+        Ok(DomainFailure {
+            code: FailureCode::new(self.code)
+                .map_err(|error| engine_error("invalid-failure-code", error))?,
+            details: self.details.map(Payload::into_domain),
+        })
+    }
+    fn from_domain(value: DomainFailure) -> Self {
+        Self {
+            code: value.code.to_string(),
+            details: value.details.map(Payload::from_domain),
+        }
+    }
+}
+
+impl RetryTimer {
+    fn try_into_domain(self) -> Result<DomainRetryTimer, EngineError> {
+        Ok(DomainRetryTimer {
+            timer_id: TimerId::new(self.timer_id)
+                .map_err(|error| engine_error("invalid-timer-id", error))?,
+            effect_id: EffectId::new(self.effect_id)
+                .map_err(|error| engine_error("invalid-effect-id", error))?,
+            failed_attempt_id: AttemptId::new(self.failed_attempt_id)
+                .map_err(|error| engine_error("invalid-attempt-id", error))?,
+            next_attempt_number: parse_attempt_number(self.next_attempt_number)?,
+            delay_ms: self.delay_ms,
+        })
+    }
+
+    fn from_domain(value: DomainRetryTimer) -> Self {
+        Self {
+            timer_id: value.timer_id.to_string(),
+            effect_id: value.effect_id.to_string(),
+            failed_attempt_id: value.failed_attempt_id.to_string(),
+            next_attempt_number: value.next_attempt_number.value(),
+            delay_ms: value.delay_ms,
         }
     }
 }
@@ -318,24 +516,78 @@ impl ExecutionEvent {
                 plan_reference: plan_reference.try_into_domain()?,
                 input: input.into_domain(),
             }),
-            Self::NodeCompleted(NodeCompletedEvent {
+            Self::NodeAttemptSucceeded(NodeAttemptSucceededEvent {
                 event_id,
                 execution_id,
                 expected_revision,
+                activation_id,
+                attempt_id,
+                attempt_number,
                 effect_id,
                 node_id,
                 output,
-            }) => Ok(DomainEvent::NodeCompleted {
+            }) => Ok(DomainEvent::NodeAttemptSucceeded {
                 event_id: EventId::new(event_id)
                     .map_err(|error| engine_error("invalid-event-id", error))?,
                 execution_id: ExecutionId::new(execution_id)
                     .map_err(|error| engine_error("invalid-execution-id", error))?,
                 expected_revision: ExecutionRevision(expected_revision),
+                activation_id: NodeActivationId::new(activation_id)
+                    .map_err(|error| engine_error("invalid-activation-id", error))?,
+                attempt_id: AttemptId::new(attempt_id)
+                    .map_err(|error| engine_error("invalid-attempt-id", error))?,
+                attempt_number: parse_attempt_number(attempt_number)?,
                 effect_id: EffectId::new(effect_id)
                     .map_err(|error| engine_error("invalid-effect-id", error))?,
                 node_id: NodeId::new(node_id)
                     .map_err(|error| engine_error("invalid-node-id", error))?,
                 output: output.into_domain(),
+            }),
+            Self::NodeAttemptFailed(NodeAttemptFailedEvent {
+                event_id,
+                execution_id,
+                expected_revision,
+                activation_id,
+                attempt_id,
+                attempt_number,
+                effect_id,
+                node_id,
+                failure,
+            }) => Ok(DomainEvent::NodeAttemptFailed {
+                event_id: EventId::new(event_id)
+                    .map_err(|error| engine_error("invalid-event-id", error))?,
+                execution_id: ExecutionId::new(execution_id)
+                    .map_err(|error| engine_error("invalid-execution-id", error))?,
+                expected_revision: ExecutionRevision(expected_revision),
+                activation_id: NodeActivationId::new(activation_id)
+                    .map_err(|error| engine_error("invalid-activation-id", error))?,
+                attempt_id: AttemptId::new(attempt_id)
+                    .map_err(|error| engine_error("invalid-attempt-id", error))?,
+                attempt_number: parse_attempt_number(attempt_number)?,
+                effect_id: EffectId::new(effect_id)
+                    .map_err(|error| engine_error("invalid-effect-id", error))?,
+                node_id: NodeId::new(node_id)
+                    .map_err(|error| engine_error("invalid-node-id", error))?,
+                failure: failure.try_into_domain()?,
+            }),
+            Self::TimerFired(TimerFiredEvent {
+                event_id,
+                execution_id,
+                expected_revision,
+                timer_id,
+                activation_id,
+                next_attempt_number,
+            }) => Ok(DomainEvent::TimerFired {
+                event_id: EventId::new(event_id)
+                    .map_err(|error| engine_error("invalid-event-id", error))?,
+                execution_id: ExecutionId::new(execution_id)
+                    .map_err(|error| engine_error("invalid-execution-id", error))?,
+                expected_revision: ExecutionRevision(expected_revision),
+                timer_id: TimerId::new(timer_id)
+                    .map_err(|error| engine_error("invalid-timer-id", error))?,
+                activation_id: NodeActivationId::new(activation_id)
+                    .map_err(|error| engine_error("invalid-activation-id", error))?,
+                next_attempt_number: parse_attempt_number(next_attempt_number)?,
             }),
         }
     }
@@ -356,19 +608,43 @@ impl TransitionResult {
 impl ExecutionEffect {
     fn from_domain(value: DomainEffect) -> Self {
         match value {
-            DomainEffect::ExecuteNode {
+            DomainEffect::ExecuteNodeAttempt {
                 effect_id,
-                execution_id,
+                activation_id,
+                attempt_id,
+                attempt_number,
                 node_id,
                 input,
-            } => Self::ExecuteNode(ExecuteNodeEffect {
+            } => Self::ExecuteNodeAttempt(ExecuteNodeAttemptEffect {
                 effect_id: effect_id.to_string(),
-                execution_id: execution_id.to_string(),
+                activation_id: activation_id.to_string(),
+                attempt_id: attempt_id.to_string(),
+                attempt_number: attempt_number.value(),
                 node_id: node_id.to_string(),
                 input: Payload::from_domain(input),
             }),
+            DomainEffect::ScheduleTimer {
+                effect_id,
+                timer_id,
+                activation_id,
+                failed_attempt_id,
+                next_attempt_number,
+                delay_ms,
+            } => Self::ScheduleTimer(ScheduleTimerEffect {
+                effect_id: effect_id.to_string(),
+                timer_id: timer_id.to_string(),
+                activation_id: activation_id.to_string(),
+                failed_attempt_id: failed_attempt_id.to_string(),
+                next_attempt_number: next_attempt_number.value(),
+                delay_ms,
+            }),
         }
     }
+}
+
+fn parse_attempt_number(value: u32) -> Result<DomainAttemptNumber, EngineError> {
+    DomainAttemptNumber::new(value)
+        .ok_or_else(|| engine_error("invalid-attempt-number", "attempt number must be non-zero"))
 }
 
 fn identifier_diagnostic(error: impl std::fmt::Display) -> Vec<DomainDiagnostic> {

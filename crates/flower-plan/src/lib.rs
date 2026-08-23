@@ -2,9 +2,10 @@ mod identifier;
 mod plan;
 
 pub use identifier::{
-    EdgeId, EffectId, EventId, ExecutionId, IdentifierError, NodeId, PlanFingerprint, WorkflowId,
+    AttemptId, EdgeId, EffectId, EventId, ExecutionId, FailureCode, IdentifierError,
+    NodeActivationId, NodeId, PlanFingerprint, TimerId, WorkflowId,
 };
 pub use plan::{
-    ExecutableWorkflowPlan, NodeIndex, NodeKind, PlanConstructionError, PlanNode, PlanReference,
-    SpecificationVersion,
+    BackoffPolicy, ExecutableWorkflowPlan, NodeIndex, NodeKind, PlanConstructionError, PlanNode,
+    PlanReference, RetryPolicy, SpecificationVersion,
 };

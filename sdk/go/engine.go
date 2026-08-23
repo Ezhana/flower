@@ -120,7 +120,15 @@ func definitionToABI(value WorkflowDefinition) (abi.WorkflowDefinition, error) {
 		if err != nil {
 			return abi.WorkflowDefinition{}, fmt.Errorf("convert definition.nodes[%d] %q: %w", index, node.ID, err)
 		}
-		nodes[index] = abi.NodeDefinition{ID: node.ID, Kind: kind}
+		retryPolicy := abi.NoneRetryPolicy()
+		if node.RetryPolicy != nil {
+			converted, err := retryPolicyToABI(*node.RetryPolicy)
+			if err != nil {
+				return abi.WorkflowDefinition{}, fmt.Errorf("convert definition.nodes[%d] %q retry policy: %w", index, node.ID, err)
+			}
+			retryPolicy = abi.SomeRetryPolicy(converted)
+		}
+		nodes[index] = abi.NodeDefinition{ID: node.ID, Kind: kind, RetryPolicy: retryPolicy}
 	}
 	edges := make([]abi.EdgeDefinition, len(value.Edges))
 	for index, edge := range value.Edges {
@@ -154,6 +162,68 @@ func nodeKindFromABI(value abi.NodeKind) (NodeKind, error) {
 	}
 }
 
+func retryPolicyToABI(value RetryPolicy) (abi.RetryPolicy, error) {
+	if value.MaxAttempts == 0 {
+		return abi.RetryPolicy{}, fmt.Errorf("max attempts must be non-zero")
+	}
+	for index, code := range value.RetryableFailureCodes {
+		if err := validateIdentifier(fmt.Sprintf("retryable failure code %d", index), code); err != nil {
+			return abi.RetryPolicy{}, err
+		}
+	}
+	var backoff abi.BackoffPolicy
+	switch value.Backoff.Type {
+	case NoBackoff:
+		if value.Backoff.DelayMs != 0 || value.Backoff.InitialDelayMs != 0 || value.Backoff.Multiplier != 0 || value.Backoff.MaximumDelayMs != 0 {
+			return abi.RetryPolicy{}, fmt.Errorf("none backoff cannot contain numeric parameters")
+		}
+		backoff = abi.BackoffPolicyNone{}
+	case FixedBackoff:
+		if value.Backoff.InitialDelayMs != 0 || value.Backoff.Multiplier != 0 || value.Backoff.MaximumDelayMs != 0 {
+			return abi.RetryPolicy{}, fmt.Errorf("fixed backoff contains exponential parameters")
+		}
+		backoff = abi.BackoffPolicyFixed{Value: abi.FixedBackoff{DelayMs: value.Backoff.DelayMs}}
+	case ExponentialBackoff:
+		if value.Backoff.DelayMs != 0 || value.Backoff.Multiplier == 0 || value.Backoff.MaximumDelayMs < value.Backoff.InitialDelayMs {
+			return abi.RetryPolicy{}, fmt.Errorf("exponential backoff violates its numeric invariants")
+		}
+		backoff = abi.BackoffPolicyExponential{Value: abi.ExponentialBackoff{
+			InitialDelayMs: value.Backoff.InitialDelayMs,
+			Multiplier:     value.Backoff.Multiplier,
+			MaximumDelayMs: value.Backoff.MaximumDelayMs,
+		}}
+	default:
+		return abi.RetryPolicy{}, fmt.Errorf("unsupported backoff kind %q", value.Backoff.Type)
+	}
+	return abi.RetryPolicy{
+		MaxAttempts:           value.MaxAttempts,
+		RetryableFailureCodes: append([]string(nil), value.RetryableFailureCodes...),
+		Backoff:               backoff,
+	}, nil
+}
+
+func retryPolicyFromABI(value abi.RetryPolicy) (RetryPolicy, error) {
+	var backoff BackoffPolicy
+	switch current := value.Backoff.(type) {
+	case abi.BackoffPolicyNone:
+		backoff = BackoffPolicy{Type: NoBackoff}
+	case abi.BackoffPolicyFixed:
+		backoff = BackoffPolicy{Type: FixedBackoff, DelayMs: current.Value.DelayMs}
+	case abi.BackoffPolicyExponential:
+		backoff = BackoffPolicy{
+			Type: ExponentialBackoff, InitialDelayMs: current.Value.InitialDelayMs,
+			Multiplier: current.Value.Multiplier, MaximumDelayMs: current.Value.MaximumDelayMs,
+		}
+	default:
+		return RetryPolicy{}, fmt.Errorf("component returned unknown backoff discriminant %T", value.Backoff)
+	}
+	return RetryPolicy{
+		MaxAttempts:           value.MaxAttempts,
+		RetryableFailureCodes: append([]string{}, value.RetryableFailureCodes...),
+		Backoff:               backoff,
+	}, nil
+}
+
 func planToABI(value ExecutableWorkflowPlan) (abi.ExecutableWorkflowPlan, error) {
 	if err := validateIdentifier("plan workflow id", value.WorkflowID); err != nil {
 		return abi.ExecutableWorkflowPlan{}, err
@@ -174,7 +244,15 @@ func planToABI(value ExecutableWorkflowPlan) (abi.ExecutableWorkflowPlan, error)
 				err,
 			)
 		}
-		nodes[index] = abi.PlanNode{ID: node.ID, Kind: kind}
+		retryPolicy := abi.NoneRetryPolicy()
+		if node.RetryPolicy != nil {
+			converted, err := retryPolicyToABI(*node.RetryPolicy)
+			if err != nil {
+				return abi.ExecutableWorkflowPlan{}, fmt.Errorf("invalid executable plan node %q retry policy: %w", node.ID, err)
+			}
+			retryPolicy = abi.SomeRetryPolicy(converted)
+		}
+		nodes[index] = abi.PlanNode{ID: node.ID, Kind: kind, RetryPolicy: retryPolicy}
 	}
 	return abi.ExecutableWorkflowPlan{SpecificationVersion: abi.SpecificationVersion{Major: value.SpecificationVersion.Major, Minor: value.SpecificationVersion.Minor}, WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint, Nodes: nodes}, nil
 }
@@ -186,7 +264,15 @@ func planFromABI(value abi.ExecutableWorkflowPlan) (ExecutableWorkflowPlan, erro
 		if err != nil {
 			return ExecutableWorkflowPlan{}, fmt.Errorf("decode plan.nodes[%d]: %w", index, err)
 		}
-		nodes[index] = PlanNode{ID: node.ID, Kind: kind}
+		var retryPolicy *RetryPolicy
+		if node.RetryPolicy.IsSome {
+			converted, err := retryPolicyFromABI(node.RetryPolicy.Value)
+			if err != nil {
+				return ExecutableWorkflowPlan{}, fmt.Errorf("decode plan.nodes[%d] retry policy: %w", index, err)
+			}
+			retryPolicy = &converted
+		}
+		nodes[index] = PlanNode{ID: node.ID, Kind: kind, RetryPolicy: retryPolicy}
 	}
 	return ExecutableWorkflowPlan{SpecificationVersion: SpecificationVersion{Major: value.SpecificationVersion.Major, Minor: value.SpecificationVersion.Minor}, WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint, Nodes: nodes}, nil
 }
@@ -196,6 +282,110 @@ func payloadToABI(value Payload) (abi.Payload, error) {
 }
 func payloadFromABI(value abi.Payload) Payload {
 	return Payload{MediaType: value.MediaType, Bytes: append([]byte(nil), value.Bytes...)}
+}
+
+func activationToABI(value NodeActivation) (abi.NodeActivation, error) {
+	if err := validateIdentifier("activation id", value.ActivationID); err != nil {
+		return abi.NodeActivation{}, err
+	}
+	if err := validateIdentifier("activation node id", value.NodeID); err != nil {
+		return abi.NodeActivation{}, err
+	}
+	input, err := payloadToABI(value.Input)
+	if err != nil {
+		return abi.NodeActivation{}, fmt.Errorf("convert activation input: %w", err)
+	}
+	return abi.NodeActivation{
+		ActivationID:       value.ActivationID,
+		ActivationRevision: value.ActivationRevision,
+		NodeID:             value.NodeID,
+		Input:              input,
+	}, nil
+}
+
+func activationFromABI(value abi.NodeActivation) NodeActivation {
+	return NodeActivation{
+		ActivationID:       value.ActivationID,
+		ActivationRevision: value.ActivationRevision,
+		NodeID:             value.NodeID,
+		Input:              payloadFromABI(value.Input),
+	}
+}
+
+func attemptToABI(value NodeAttempt) (abi.NodeAttempt, error) {
+	if err := validateIdentifier("attempt id", value.AttemptID); err != nil {
+		return abi.NodeAttempt{}, err
+	}
+	if value.AttemptNumber == 0 {
+		return abi.NodeAttempt{}, fmt.Errorf("attempt number must be non-zero")
+	}
+	if err := validateIdentifier("attempt effect id", value.EffectID); err != nil {
+		return abi.NodeAttempt{}, err
+	}
+	return abi.NodeAttempt{
+		AttemptID:     value.AttemptID,
+		AttemptNumber: value.AttemptNumber,
+		EffectID:      value.EffectID,
+	}, nil
+}
+
+func attemptFromABI(value abi.NodeAttempt) NodeAttempt {
+	return NodeAttempt{
+		AttemptID:     value.AttemptID,
+		AttemptNumber: value.AttemptNumber,
+		EffectID:      value.EffectID,
+	}
+}
+
+func failureToABI(value AttemptFailure) (abi.AttemptFailure, error) {
+	if err := validateIdentifier("failure code", value.Code); err != nil {
+		return abi.AttemptFailure{}, err
+	}
+	details := abi.NonePayload()
+	if value.Details != nil {
+		converted, err := payloadToABI(*value.Details)
+		if err != nil {
+			return abi.AttemptFailure{}, fmt.Errorf("convert failure details: %w", err)
+		}
+		details = abi.SomePayload(converted)
+	}
+	return abi.AttemptFailure{Code: value.Code, Details: details}, nil
+}
+
+func failureFromABI(value abi.AttemptFailure) AttemptFailure {
+	var details *Payload
+	if value.Details.IsSome {
+		converted := payloadFromABI(value.Details.Value)
+		details = &converted
+	}
+	return AttemptFailure{Code: value.Code, Details: details}
+}
+
+func retryTimerToABI(value RetryTimer) (abi.RetryTimer, error) {
+	identifiers := []struct{ field, value string }{
+		{field: "retry timer id", value: value.TimerID},
+		{field: "retry timer effect id", value: value.EffectID},
+		{field: "retry timer failed attempt id", value: value.FailedAttemptID},
+	}
+	for _, identifier := range identifiers {
+		if err := validateIdentifier(identifier.field, identifier.value); err != nil {
+			return abi.RetryTimer{}, err
+		}
+	}
+	if value.NextAttemptNumber == 0 {
+		return abi.RetryTimer{}, fmt.Errorf("retry timer next attempt number must be non-zero")
+	}
+	return abi.RetryTimer{
+		TimerID: value.TimerID, EffectID: value.EffectID, FailedAttemptID: value.FailedAttemptID,
+		NextAttemptNumber: value.NextAttemptNumber, DelayMs: value.DelayMs,
+	}, nil
+}
+
+func retryTimerFromABI(value abi.RetryTimer) RetryTimer {
+	return RetryTimer{
+		TimerID: value.TimerID, EffectID: value.EffectID, FailedAttemptID: value.FailedAttemptID,
+		NextAttemptNumber: value.NextAttemptNumber, DelayMs: value.DelayMs,
+	}
 }
 
 func planReferenceToABI(value PlanReference) (abi.PlanReference, error) {
@@ -236,24 +426,56 @@ func snapshotToABI(value ExecutionSnapshot) (abi.ExecutionSnapshot, error) {
 	}
 	var state abi.ExecutionState
 	switch current := value.State.(type) {
-	case AwaitingNode:
-		if err := validateIdentifier("snapshot awaiting node id", current.NodeID); err != nil {
-			return abi.ExecutionSnapshot{}, err
-		}
-		if err := validateIdentifier("snapshot awaiting effect id", current.EffectID); err != nil {
-			return abi.ExecutionSnapshot{}, err
-		}
-		input, err := payloadToABI(current.Input)
+	case AwaitingAttempt:
+		activation, err := activationToABI(current.Activation)
 		if err != nil {
-			return abi.ExecutionSnapshot{}, fmt.Errorf("convert snapshot awaiting input: %w", err)
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert awaiting activation: %w", err)
 		}
-		state = abi.ExecutionStateAwaitingNode{Value: abi.AwaitingNode{NodeID: current.NodeID, EffectID: current.EffectID, Input: input}}
+		attempt, err := attemptToABI(current.Attempt)
+		if err != nil {
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert awaiting attempt: %w", err)
+		}
+		state = abi.ExecutionStateAwaitingAttempt{Value: abi.AwaitingAttempt{Activation: activation, Attempt: attempt}}
+	case WaitingForRetry:
+		activation, err := activationToABI(current.Activation)
+		if err != nil {
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert retry activation: %w", err)
+		}
+		attempt, err := attemptToABI(current.Attempt)
+		if err != nil {
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert retry attempt: %w", err)
+		}
+		failure, err := failureToABI(current.Failure)
+		if err != nil {
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert retry failure: %w", err)
+		}
+		timer, err := retryTimerToABI(current.Timer)
+		if err != nil {
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert retry timer: %w", err)
+		}
+		state = abi.ExecutionStateWaitingForRetry{Value: abi.WaitingForRetry{
+			Activation: activation, Attempt: attempt, Failure: failure, Timer: timer,
+		}}
 	case Completed:
 		output, err := payloadToABI(current.Output)
 		if err != nil {
 			return abi.ExecutionSnapshot{}, fmt.Errorf("convert snapshot completed output: %w", err)
 		}
 		state = abi.ExecutionStateCompleted{Value: output}
+	case Failed:
+		activation, err := activationToABI(current.Activation)
+		if err != nil {
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert failed activation: %w", err)
+		}
+		attempt, err := attemptToABI(current.Attempt)
+		if err != nil {
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert failed attempt: %w", err)
+		}
+		failure, err := failureToABI(current.Failure)
+		if err != nil {
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert failed failure: %w", err)
+		}
+		state = abi.ExecutionStateFailed{Value: abi.FailedExecution{Activation: activation, Attempt: attempt, Failure: failure}}
 	default:
 		return abi.ExecutionSnapshot{}, fmt.Errorf("unsupported execution state %T", value.State)
 	}
@@ -268,10 +490,23 @@ func snapshotToABI(value ExecutionSnapshot) (abi.ExecutionSnapshot, error) {
 func snapshotFromABI(value abi.ExecutionSnapshot) (ExecutionSnapshot, error) {
 	var state ExecutionState
 	switch current := value.State.(type) {
-	case abi.ExecutionStateAwaitingNode:
-		state = AwaitingNode{NodeID: current.Value.NodeID, EffectID: current.Value.EffectID, Input: payloadFromABI(current.Value.Input)}
+	case abi.ExecutionStateAwaitingAttempt:
+		state = AwaitingAttempt{Activation: activationFromABI(current.Value.Activation), Attempt: attemptFromABI(current.Value.Attempt)}
+	case abi.ExecutionStateWaitingForRetry:
+		state = WaitingForRetry{
+			Activation: activationFromABI(current.Value.Activation),
+			Attempt:    attemptFromABI(current.Value.Attempt),
+			Failure:    failureFromABI(current.Value.Failure),
+			Timer:      retryTimerFromABI(current.Value.Timer),
+		}
 	case abi.ExecutionStateCompleted:
 		state = Completed{Output: payloadFromABI(current.Value)}
+	case abi.ExecutionStateFailed:
+		state = Failed{
+			Activation: activationFromABI(current.Value.Activation),
+			Attempt:    attemptFromABI(current.Value.Attempt),
+			Failure:    failureFromABI(current.Value.Failure),
+		}
 	default:
 		return ExecutionSnapshot{}, fmt.Errorf("component returned unknown execution-state discriminant %T", value.State)
 	}
@@ -306,26 +541,81 @@ func eventToABI(value ExecutionEvent) (abi.ExecutionEvent, error) {
 			PlanReference: planReference,
 			Input:         input,
 		}}, nil
-	case NodeCompleted:
+	case NodeAttemptSucceeded:
 		identifiers := []struct {
 			field string
 			value string
 		}{
-			{field: "node-completed event id", value: event.EventID},
-			{field: "node-completed execution id", value: event.ExecutionID},
-			{field: "node-completed effect id", value: event.EffectID},
-			{field: "node-completed node id", value: event.NodeID},
+			{field: "node-attempt-succeeded event id", value: event.EventID},
+			{field: "node-attempt-succeeded execution id", value: event.ExecutionID},
+			{field: "node-attempt-succeeded activation id", value: event.ActivationID},
+			{field: "node-attempt-succeeded attempt id", value: event.AttemptID},
+			{field: "node-attempt-succeeded effect id", value: event.EffectID},
+			{field: "node-attempt-succeeded node id", value: event.NodeID},
 		}
 		for _, identifier := range identifiers {
 			if err := validateIdentifier(identifier.field, identifier.value); err != nil {
 				return nil, err
 			}
 		}
+		if event.AttemptNumber == 0 {
+			return nil, fmt.Errorf("node-attempt-succeeded attempt number must be non-zero")
+		}
 		output, err := payloadToABI(event.Output)
 		if err != nil {
-			return nil, fmt.Errorf("convert node-completed output: %w", err)
+			return nil, fmt.Errorf("convert node-attempt-succeeded output: %w", err)
 		}
-		return abi.ExecutionEventNodeCompleted{Value: abi.NodeCompletedEvent{EventID: event.EventID, ExecutionID: event.ExecutionID, ExpectedRevision: event.ExpectedRevision, EffectID: event.EffectID, NodeID: event.NodeID, Output: output}}, nil
+		return abi.ExecutionEventNodeAttemptSucceeded{Value: abi.NodeAttemptSucceededEvent{
+			EventID: event.EventID, ExecutionID: event.ExecutionID, ExpectedRevision: event.ExpectedRevision,
+			ActivationID: event.ActivationID, AttemptID: event.AttemptID, AttemptNumber: event.AttemptNumber,
+			EffectID: event.EffectID, NodeID: event.NodeID, Output: output,
+		}}, nil
+	case NodeAttemptFailed:
+		identifiers := []struct{ field, value string }{
+			{field: "node-attempt-failed event id", value: event.EventID},
+			{field: "node-attempt-failed execution id", value: event.ExecutionID},
+			{field: "node-attempt-failed activation id", value: event.ActivationID},
+			{field: "node-attempt-failed attempt id", value: event.AttemptID},
+			{field: "node-attempt-failed effect id", value: event.EffectID},
+			{field: "node-attempt-failed node id", value: event.NodeID},
+		}
+		for _, identifier := range identifiers {
+			if err := validateIdentifier(identifier.field, identifier.value); err != nil {
+				return nil, err
+			}
+		}
+		if event.AttemptNumber == 0 {
+			return nil, fmt.Errorf("node-attempt-failed attempt number must be non-zero")
+		}
+		failure, err := failureToABI(event.Failure)
+		if err != nil {
+			return nil, fmt.Errorf("convert node-attempt-failed failure: %w", err)
+		}
+		return abi.ExecutionEventNodeAttemptFailed{Value: abi.NodeAttemptFailedEvent{
+			EventID: event.EventID, ExecutionID: event.ExecutionID, ExpectedRevision: event.ExpectedRevision,
+			ActivationID: event.ActivationID, AttemptID: event.AttemptID, AttemptNumber: event.AttemptNumber,
+			EffectID: event.EffectID, NodeID: event.NodeID, Failure: failure,
+		}}, nil
+	case TimerFired:
+		identifiers := []struct{ field, value string }{
+			{field: "timer-fired event id", value: event.EventID},
+			{field: "timer-fired execution id", value: event.ExecutionID},
+			{field: "timer-fired timer id", value: event.TimerID},
+			{field: "timer-fired activation id", value: event.ActivationID},
+		}
+		for _, identifier := range identifiers {
+			if err := validateIdentifier(identifier.field, identifier.value); err != nil {
+				return nil, err
+			}
+		}
+		if event.NextAttemptNumber == 0 {
+			return nil, fmt.Errorf("timer-fired next attempt number must be non-zero")
+		}
+		return abi.ExecutionEventTimerFired{Value: abi.TimerFiredEvent{
+			EventID: event.EventID, ExecutionID: event.ExecutionID,
+			ExpectedRevision: event.ExpectedRevision, TimerID: event.TimerID,
+			ActivationID: event.ActivationID, NextAttemptNumber: event.NextAttemptNumber,
+		}}, nil
 	default:
 		return nil, fmt.Errorf("unsupported execution event %T", value)
 	}
@@ -368,8 +658,18 @@ func transitionFromABI(value abi.TransitionResult) (Transition, error) {
 	effects := make([]ExecutionEffect, len(value.Effects))
 	for index, effect := range value.Effects {
 		switch current := effect.(type) {
-		case abi.ExecutionEffectExecuteNode:
-			effects[index] = ExecuteNode{EffectID: current.Value.EffectID, ExecutionID: current.Value.ExecutionID, NodeID: current.Value.NodeID, Input: payloadFromABI(current.Value.Input)}
+		case abi.ExecutionEffectExecuteNodeAttempt:
+			effects[index] = ExecuteNodeAttempt{
+				EffectID: current.Value.EffectID, ActivationID: current.Value.ActivationID,
+				AttemptID: current.Value.AttemptID, AttemptNumber: current.Value.AttemptNumber,
+				NodeID: current.Value.NodeID, Input: payloadFromABI(current.Value.Input),
+			}
+		case abi.ExecutionEffectScheduleTimer:
+			effects[index] = ScheduleTimer{
+				EffectID: current.Value.EffectID, TimerID: current.Value.TimerID,
+				ActivationID: current.Value.ActivationID, FailedAttemptID: current.Value.FailedAttemptID,
+				NextAttemptNumber: current.Value.NextAttemptNumber, DelayMs: current.Value.DelayMs,
+			}
 		default:
 			return Transition{}, fmt.Errorf("component returned unknown execution-effect discriminant at %d: %T", index, effect)
 		}

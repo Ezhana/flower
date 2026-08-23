@@ -63,7 +63,7 @@ Retry policy 编译进 `ExecutableWorkflowPlan`，Kernel 根据 `FailureCode` �
 
 ```text
 NodeAttemptFailed
-├── terminal / exhausted -> ExecutionFailed
+├── terminal / exhausted -> Failed
 └── retryable            -> WaitingForRetry + ScheduleTimer
 
 TimerFired
@@ -86,3 +86,13 @@ TimerFired
 - 完整 replay 与 stored head 一致。
 
 PostgreSQL 只能实现已经冻结的 Store contract，不得反向塑造领域模型。
+
+当前 contract 已冻结为：
+
+```text
+Pending
+-> Claimed { claim_id, owner_id, lease_until }
+-> Confirmed
+```
+
+过期或主动释放的 claim 可重新领取；确认必须同时匹配 EffectId、ClaimId、DispatcherId 与 lease。内存实现承担故障语义测试，PostgreSQL 只映射该 contract 的事务、唯一约束与 `FOR UPDATE SKIP LOCKED` 原子 claim。

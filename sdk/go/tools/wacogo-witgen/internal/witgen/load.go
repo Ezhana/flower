@@ -4,6 +4,8 @@ package witgen
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"go.bytecodealliance.org/wit"
 )
@@ -14,7 +16,20 @@ import (
 // `include` references resolve before Load returns, so the *Resolve
 // can be walked without further name lookup.
 func Load(path string) (*wit.Resolve, error) {
-	res, err := wit.LoadWIT(path)
+	var (
+		res *wit.Resolve
+		err error
+	)
+	if filepath.Ext(path) == ".json" {
+		res, err = wit.LoadJSON(path)
+	} else {
+		file, openErr := os.Open(path)
+		if openErr != nil {
+			return nil, fmt.Errorf("witgen: open %s: %w", path, openErr)
+		}
+		defer file.Close()
+		res, err = wit.DecodeWIT(file)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("witgen: load %s: %w", path, err)
 	}
