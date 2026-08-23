@@ -1,7 +1,9 @@
 use std::{collections::BTreeMap, sync::Mutex};
 
-use flower_host::{CommitError, ExecutionStore, PendingEffect, StoreError, StoredExecution};
-use flower_kernel::{ExecutionEvent, ExecutionRevision, Transition};
+use flower_host::{
+    CommitError, CommitOutcome, ConfirmEffectError, ExecutionCommit, ExecutionCommitParts,
+    ExecutionHead, ExecutionStore, PendingEffect, StoreError, StoredExecution,
+};
 use flower_plan::{EffectId, ExecutionId};
 
 #[derive(Debug, Default)]
@@ -28,44 +30,56 @@ impl ExecutionStore for MemoryExecutionStore {
             .cloned())
     }
 
-    async fn commit(
-        &self,
-        execution_id: &ExecutionId,
-        expected_revision: ExecutionRevision,
-        event: ExecutionEvent,
-        transition: Transition,
-    ) -> Result<(), CommitError> {
-        if execution_id != &transition.snapshot.execution_id || execution_id != event.execution_id()
-        {
-            return Err(CommitError::ExecutionIdMismatch);
-        }
+    async fn commit(&self, commit: ExecutionCommit) -> Result<CommitOutcome, CommitError> {
         let mut executions = self.executions.lock().map_err(poisoned)?;
-        let actual_revision = executions
-            .get(execution_id)
-            .map_or(ExecutionRevision(0), |stored| stored.snapshot.revision);
-        if actual_revision != expected_revision {
-            return Err(CommitError::Conflict {
-                expected: expected_revision,
-                actual: actual_revision,
-            });
-        }
-        if executions.get(execution_id).is_some_and(|stored| {
+        if let Some(existing) = executions.get(commit.execution_id()).and_then(|stored| {
             stored
                 .events
                 .iter()
-                .any(|existing| existing.event_id() == event.event_id())
+                .find(|existing| existing.event_id() == commit.event().event_id())
         }) {
-            return Err(CommitError::DuplicateEvent {
-                event_id: event.event_id().clone(),
+            if existing == commit.event() {
+                return Ok(CommitOutcome::AlreadyCommitted);
+            }
+            return Err(CommitError::EventIdentityConflict {
+                event_id: commit.event().event_id().clone(),
             });
         }
+        let actual_revision = executions
+            .get(commit.execution_id())
+            .map_or(flower_kernel::ExecutionRevision(0), |stored| {
+                stored.head.revision
+            });
+        if actual_revision != commit.expected_revision() {
+            return Err(CommitError::Conflict {
+                expected: commit.expected_revision(),
+                actual: actual_revision,
+            });
+        }
+        if let Some(stored) = executions.get(commit.execution_id())
+            && stored.head.plan_reference != commit.transition().snapshot.plan_reference
+        {
+            return Err(CommitError::PlanReferenceMismatch);
+        }
+        let ExecutionCommitParts {
+            execution_id,
+            event,
+            transition,
+            ..
+        } = commit.into_parts();
+        let head = ExecutionHead {
+            plan_reference: transition.snapshot.plan_reference.clone(),
+            revision: transition.snapshot.revision,
+        };
         let stored = executions
-            .entry(execution_id.clone())
+            .entry(execution_id)
             .or_insert_with(|| StoredExecution {
+                head: head.clone(),
                 snapshot: transition.snapshot.clone(),
                 events: Vec::new(),
                 outbox: Vec::new(),
             });
+        stored.head = head;
         stored.snapshot = transition.snapshot;
         stored.events.push(event);
         stored
@@ -74,23 +88,28 @@ impl ExecutionStore for MemoryExecutionStore {
                 effect,
                 dispatched: false,
             }));
-        Ok(())
+        Ok(CommitOutcome::Committed)
     }
 
-    async fn mark_effect_dispatched(
+    async fn confirm_effect_dispatched(
         &self,
         execution_id: &ExecutionId,
         effect_id: &EffectId,
-    ) -> Result<(), StoreError> {
+    ) -> Result<(), ConfirmEffectError> {
         let mut executions = self.executions.lock().map_err(poisoned)?;
-        if let Some(effect) = executions.get_mut(execution_id).and_then(|stored| {
-            stored
-                .outbox
-                .iter_mut()
-                .find(|pending| pending.effect.effect_id() == effect_id)
-        }) {
-            effect.dispatched = true;
-        }
+        let stored = executions.get_mut(execution_id).ok_or_else(|| {
+            ConfirmEffectError::ExecutionNotFound {
+                execution_id: execution_id.clone(),
+            }
+        })?;
+        let effect = stored
+            .outbox
+            .iter_mut()
+            .find(|pending| pending.effect.effect_id() == effect_id)
+            .ok_or_else(|| ConfirmEffectError::EffectNotFound {
+                effect_id: effect_id.clone(),
+            })?;
+        effect.dispatched = true;
         Ok(())
     }
 }
@@ -111,9 +130,12 @@ mod tests {
     };
 
     use flower_compiler::{EdgeDefinition, NodeDefinition, WorkflowDefinition, compile};
-    use flower_host::{CommitError, EffectDispatcher, ExecutionStore, WorkflowHost, replay};
+    use flower_host::{
+        CommitError, CommitOutcome, ConfirmEffectError, EffectDispatcher, EventHandlingOutcome,
+        ExecutionCommit, ExecutionStore, WorkflowHost, replay,
+    };
     use flower_kernel::{
-        ExecutionEffect, ExecutionEvent, ExecutionRevision, ExecutionState, Payload,
+        ExecutionEffect, ExecutionEvent, ExecutionRevision, ExecutionState, Payload, Transition,
         TransitionError, transition,
     };
     use flower_plan::{
@@ -186,15 +208,29 @@ mod tests {
         }
     }
 
+    fn commit(
+        expected_revision: ExecutionRevision,
+        event: ExecutionEvent,
+        transition: Transition,
+    ) -> ExecutionCommit {
+        ExecutionCommit::new(expected_revision, event, transition).unwrap()
+    }
+
     #[test]
     fn atomically_commits_snapshot_event_and_outbox_and_replays() {
         let store = Arc::new(MemoryExecutionStore::new());
         let host = WorkflowHost::new(store.clone());
-        let transition = block_on(host.handle(&plan(), started())).unwrap();
+        let EventHandlingOutcome::Committed(transition) =
+            block_on(host.handle_event(&plan(), started())).unwrap()
+        else {
+            panic!("a new event must be committed")
+        };
         let stored = block_on(store.load(&ExecutionId::new("execution").unwrap()))
             .unwrap()
             .unwrap();
         assert_eq!(stored.snapshot, transition.snapshot);
+        assert_eq!(stored.head.plan_reference, stored.snapshot.plan_reference);
+        assert_eq!(stored.head.revision, stored.snapshot.revision);
         assert_eq!(stored.events, vec![started()]);
         assert_eq!(stored.outbox.len(), 1);
         assert!(!stored.outbox[0].dispatched);
@@ -244,13 +280,11 @@ mod tests {
         let store = MemoryExecutionStore::new();
         let plan = plan();
         let first = transition(&plan, None, started()).unwrap();
-        block_on(store.commit(
-            &id("execution"),
-            ExecutionRevision(0),
-            started(),
-            first.clone(),
-        ))
-        .unwrap();
+        assert_eq!(
+            block_on(store.commit(commit(ExecutionRevision(0), started(), first.clone(),)))
+                .unwrap(),
+            CommitOutcome::Committed
+        );
         let ExecutionState::AwaitingNode {
             node_id, effect_id, ..
         } = &first.snapshot.state
@@ -266,24 +300,44 @@ mod tests {
             output: payload("done"),
         };
         let next = transition(&plan, Some(&first.snapshot), completion.clone()).unwrap();
-        block_on(store.commit(
-            &id("execution"),
-            first.snapshot.revision,
-            completion.clone(),
-            next.clone(),
-        ))
-        .unwrap();
+        assert_eq!(
+            block_on(store.commit(commit(
+                first.snapshot.revision,
+                completion.clone(),
+                next.clone(),
+            )))
+            .unwrap(),
+            CommitOutcome::Committed
+        );
+        let competing_completion = ExecutionEvent::NodeCompleted {
+            event_id: id("event-3"),
+            execution_id: id("execution"),
+            expected_revision: first.snapshot.revision,
+            effect_id: effect_id.clone(),
+            node_id: node_id.clone(),
+            output: payload("done"),
+        };
+        let competing_transition =
+            transition(&plan, Some(&first.snapshot), competing_completion.clone()).unwrap();
         assert!(matches!(
-            block_on(store.commit(&id("execution"), first.snapshot.revision, completion, next)),
+            block_on(store.commit(commit(
+                first.snapshot.revision,
+                competing_completion,
+                competing_transition,
+            ))),
             Err(CommitError::Conflict { .. })
         ));
+        assert_eq!(
+            block_on(store.commit(commit(first.snapshot.revision, completion, next,))).unwrap(),
+            CommitOutcome::AlreadyCommitted
+        );
     }
 
     #[test]
     fn recovers_pending_effect_and_does_not_redispatch_after_confirmation() {
         let store = Arc::new(MemoryExecutionStore::new());
         let first_host = WorkflowHost::new(store.clone());
-        block_on(first_host.handle(&plan(), started())).unwrap();
+        block_on(first_host.handle_event(&plan(), started())).unwrap();
 
         let recovered_host = WorkflowHost::new(store.clone());
         let dispatcher = RecordingDispatcher::default();
@@ -307,22 +361,120 @@ mod tests {
             node_id: node_id.clone(),
             output: payload("done"),
         };
-        let completed = block_on(recovered_host.handle(&plan(), completion.clone())).unwrap();
+        let EventHandlingOutcome::Committed(completed) =
+            block_on(recovered_host.handle_event(&plan(), completion.clone())).unwrap()
+        else {
+            panic!("a new completion must be committed")
+        };
         assert!(matches!(
             completed.snapshot.state,
             ExecutionState::Completed { .. }
         ));
+        assert_eq!(
+            block_on(recovered_host.handle_event(&plan(), completion)).unwrap(),
+            EventHandlingOutcome::AlreadyCommitted
+        );
+    }
+
+    #[test]
+    fn confirming_an_unknown_effect_is_a_domain_error() {
+        let store = MemoryExecutionStore::new();
+        assert_eq!(
+            block_on(store.confirm_effect_dispatched(&id("missing"), &id("effect-missing"))),
+            Err(ConfirmEffectError::ExecutionNotFound {
+                execution_id: id("missing")
+            })
+        );
+
+        let first = transition(&plan(), None, started()).unwrap();
+        block_on(store.commit(commit(ExecutionRevision(0), started(), first))).unwrap();
+        assert_eq!(
+            block_on(store.confirm_effect_dispatched(&id("execution"), &id("effect-missing"),)),
+            Err(ConfirmEffectError::EffectNotFound {
+                effect_id: id("effect-missing")
+            })
+        );
+    }
+
+    #[test]
+    fn event_identity_is_scoped_to_one_execution() {
+        let store = Arc::new(MemoryExecutionStore::new());
+        let host = WorkflowHost::new(store);
         assert!(matches!(
-            block_on(recovered_host.handle(&plan(), completion)),
+            block_on(host.handle_event(&plan(), started())).unwrap(),
+            EventHandlingOutcome::Committed(_)
+        ));
+
+        let conflicting_event = ExecutionEvent::ExecutionStarted {
+            event_id: id("event-1"),
+            execution_id: id("execution"),
+            plan_reference: plan().reference(),
+            input: payload("different-input"),
+        };
+        assert!(matches!(
+            block_on(host.handle_event(&plan(), conflicting_event)),
             Err(flower_host::HostError::Commit(
-                CommitError::DuplicateEvent { .. }
+                CommitError::EventIdentityConflict { .. }
             ))
         ));
+
+        let another_execution = ExecutionEvent::ExecutionStarted {
+            event_id: id("event-1"),
+            execution_id: id("another-execution"),
+            plan_reference: plan().reference(),
+            input: payload("input"),
+        };
+        assert!(matches!(
+            block_on(host.handle_event(&plan(), another_execution)).unwrap(),
+            EventHandlingOutcome::Committed(_)
+        ));
+    }
+
+    #[test]
+    fn dispatch_is_at_least_once_when_confirmation_is_not_recorded() {
+        let store = Arc::new(MemoryExecutionStore::new());
+        let host = WorkflowHost::new(store.clone());
+        block_on(host.handle_event(&plan(), started())).unwrap();
+
+        let failing_dispatcher = FailingAfterRecordingDispatcher::default();
+        assert!(block_on(host.dispatch_pending(&id("execution"), &failing_dispatcher)).is_err());
+        let successful_dispatcher = RecordingDispatcher::default();
+        block_on(host.dispatch_pending(&id("execution"), &successful_dispatcher)).unwrap();
+
+        assert_eq!(
+            *failing_dispatcher.effect_ids.lock().unwrap(),
+            *successful_dispatcher.effect_ids.lock().unwrap()
+        );
+        assert_eq!(successful_dispatcher.effect_ids.lock().unwrap().len(), 1);
+        assert!(
+            block_on(store.load(&id("execution")))
+                .unwrap()
+                .unwrap()
+                .outbox[0]
+                .dispatched
+        );
     }
 
     #[derive(Default)]
     struct RecordingDispatcher {
         effect_ids: Mutex<Vec<EffectId>>,
+    }
+
+    #[derive(Default)]
+    struct FailingAfterRecordingDispatcher {
+        effect_ids: Mutex<Vec<EffectId>>,
+    }
+
+    impl EffectDispatcher for FailingAfterRecordingDispatcher {
+        type Error = &'static str;
+
+        async fn dispatch(&self, effect: &ExecutionEffect) -> Result<(), Self::Error> {
+            self.effect_ids
+                .lock()
+                .unwrap()
+                .push(effect.effect_id().clone());
+            Err("executor exited before outbox confirmation")
+        }
     }
 
     impl EffectDispatcher for RecordingDispatcher {

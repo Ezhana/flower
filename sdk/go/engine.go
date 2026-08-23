@@ -49,9 +49,9 @@ func (e *componentEngine) Compile(ctx context.Context, definition WorkflowDefini
 	if e.closed {
 		return ExecutableWorkflowPlan{}, nil, fmt.Errorf("flower engine is closed")
 	}
-	abiDefinition, diagnostics := definitionToABI(definition)
-	if len(diagnostics) != 0 {
-		return ExecutableWorkflowPlan{}, diagnostics, nil
+	abiDefinition, err := definitionToABI(definition)
+	if err != nil {
+		return ExecutableWorkflowPlan{}, nil, err
 	}
 	result, err := e.client.Compile(ctx, abiDefinition)
 	if err != nil {
@@ -113,17 +113,12 @@ func (e *componentEngine) Transition(ctx context.Context, plan ExecutableWorkflo
 	}
 }
 
-func definitionToABI(value WorkflowDefinition) (abi.WorkflowDefinition, []Diagnostic) {
+func definitionToABI(value WorkflowDefinition) (abi.WorkflowDefinition, error) {
 	nodes := make([]abi.NodeDefinition, len(value.Nodes))
 	for index, node := range value.Nodes {
 		kind, err := nodeKindToABI(node.Kind)
 		if err != nil {
-			subject := node.ID
-			return abi.WorkflowDefinition{}, []Diagnostic{{
-				Code:    "invalid-node-kind",
-				Message: fmt.Sprintf("node %q: %v", node.ID, err),
-				Subject: &subject,
-			}}
+			return abi.WorkflowDefinition{}, fmt.Errorf("convert definition.nodes[%d] %q: %w", index, node.ID, err)
 		}
 		nodes[index] = abi.NodeDefinition{ID: node.ID, Kind: kind}
 	}
@@ -160,8 +155,17 @@ func nodeKindFromABI(value abi.NodeKind) (NodeKind, error) {
 }
 
 func planToABI(value ExecutableWorkflowPlan) (abi.ExecutableWorkflowPlan, error) {
+	if err := validateIdentifier("plan workflow id", value.WorkflowID); err != nil {
+		return abi.ExecutableWorkflowPlan{}, err
+	}
+	if err := validateFingerprint("plan fingerprint", value.Fingerprint); err != nil {
+		return abi.ExecutableWorkflowPlan{}, err
+	}
 	nodes := make([]abi.PlanNode, len(value.Nodes))
 	for index, node := range value.Nodes {
+		if err := validateIdentifier(fmt.Sprintf("plan.nodes[%d] id", index), node.ID); err != nil {
+			return abi.ExecutableWorkflowPlan{}, err
+		}
 		kind, err := nodeKindToABI(node.Kind)
 		if err != nil {
 			return abi.ExecutableWorkflowPlan{}, fmt.Errorf(
@@ -187,14 +191,20 @@ func planFromABI(value abi.ExecutableWorkflowPlan) (ExecutableWorkflowPlan, erro
 	return ExecutableWorkflowPlan{SpecificationVersion: SpecificationVersion{Major: value.SpecificationVersion.Major, Minor: value.SpecificationVersion.Minor}, WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint, Nodes: nodes}, nil
 }
 
-func payloadToABI(value Payload) abi.Payload {
-	return abi.Payload{MediaType: value.MediaType, Bytes: append([]byte(nil), value.Bytes...)}
+func payloadToABI(value Payload) (abi.Payload, error) {
+	return abi.Payload{MediaType: value.MediaType, Bytes: append([]byte(nil), value.Bytes...)}, nil
 }
 func payloadFromABI(value abi.Payload) Payload {
 	return Payload{MediaType: value.MediaType, Bytes: append([]byte(nil), value.Bytes...)}
 }
 
-func planReferenceToABI(value PlanReference) abi.PlanReference {
+func planReferenceToABI(value PlanReference) (abi.PlanReference, error) {
+	if err := validateIdentifier("plan reference workflow id", value.WorkflowID); err != nil {
+		return abi.PlanReference{}, err
+	}
+	if err := validateFingerprint("plan reference fingerprint", value.Fingerprint); err != nil {
+		return abi.PlanReference{}, err
+	}
 	return abi.PlanReference{
 		SpecificationVersion: abi.SpecificationVersion{
 			Major: value.SpecificationVersion.Major,
@@ -202,7 +212,7 @@ func planReferenceToABI(value PlanReference) abi.PlanReference {
 		},
 		WorkflowID:  value.WorkflowID,
 		Fingerprint: value.Fingerprint,
-	}
+	}, nil
 }
 
 func planReferenceFromABI(value abi.PlanReference) PlanReference {
@@ -217,18 +227,39 @@ func planReferenceFromABI(value abi.PlanReference) PlanReference {
 }
 
 func snapshotToABI(value ExecutionSnapshot) (abi.ExecutionSnapshot, error) {
+	if err := validateIdentifier("snapshot execution id", value.ExecutionID); err != nil {
+		return abi.ExecutionSnapshot{}, err
+	}
+	planReference, err := planReferenceToABI(value.PlanReference)
+	if err != nil {
+		return abi.ExecutionSnapshot{}, fmt.Errorf("convert snapshot: %w", err)
+	}
 	var state abi.ExecutionState
 	switch current := value.State.(type) {
 	case AwaitingNode:
-		state = abi.ExecutionStateAwaitingNode{Value: abi.AwaitingNode{NodeID: current.NodeID, EffectID: current.EffectID, Input: payloadToABI(current.Input)}}
+		if err := validateIdentifier("snapshot awaiting node id", current.NodeID); err != nil {
+			return abi.ExecutionSnapshot{}, err
+		}
+		if err := validateIdentifier("snapshot awaiting effect id", current.EffectID); err != nil {
+			return abi.ExecutionSnapshot{}, err
+		}
+		input, err := payloadToABI(current.Input)
+		if err != nil {
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert snapshot awaiting input: %w", err)
+		}
+		state = abi.ExecutionStateAwaitingNode{Value: abi.AwaitingNode{NodeID: current.NodeID, EffectID: current.EffectID, Input: input}}
 	case Completed:
-		state = abi.ExecutionStateCompleted{Value: payloadToABI(current.Output)}
+		output, err := payloadToABI(current.Output)
+		if err != nil {
+			return abi.ExecutionSnapshot{}, fmt.Errorf("convert snapshot completed output: %w", err)
+		}
+		state = abi.ExecutionStateCompleted{Value: output}
 	default:
 		return abi.ExecutionSnapshot{}, fmt.Errorf("unsupported execution state %T", value.State)
 	}
 	return abi.ExecutionSnapshot{
 		ExecutionID:   value.ExecutionID,
-		PlanReference: planReferenceToABI(value.PlanReference),
+		PlanReference: planReference,
 		Revision:      value.Revision,
 		State:         state,
 	}, nil
@@ -255,17 +286,78 @@ func snapshotFromABI(value abi.ExecutionSnapshot) (ExecutionSnapshot, error) {
 func eventToABI(value ExecutionEvent) (abi.ExecutionEvent, error) {
 	switch event := value.(type) {
 	case ExecutionStarted:
+		if err := validateIdentifier("execution-started event id", event.EventID); err != nil {
+			return nil, err
+		}
+		if err := validateIdentifier("execution-started execution id", event.ExecutionID); err != nil {
+			return nil, err
+		}
+		planReference, err := planReferenceToABI(event.PlanReference)
+		if err != nil {
+			return nil, fmt.Errorf("convert execution-started: %w", err)
+		}
+		input, err := payloadToABI(event.Input)
+		if err != nil {
+			return nil, fmt.Errorf("convert execution-started input: %w", err)
+		}
 		return abi.ExecutionEventExecutionStarted{Value: abi.ExecutionStartedEvent{
 			EventID:       event.EventID,
 			ExecutionID:   event.ExecutionID,
-			PlanReference: planReferenceToABI(event.PlanReference),
-			Input:         payloadToABI(event.Input),
+			PlanReference: planReference,
+			Input:         input,
 		}}, nil
 	case NodeCompleted:
-		return abi.ExecutionEventNodeCompleted{Value: abi.NodeCompletedEvent{EventID: event.EventID, ExecutionID: event.ExecutionID, ExpectedRevision: event.ExpectedRevision, EffectID: event.EffectID, NodeID: event.NodeID, Output: payloadToABI(event.Output)}}, nil
+		identifiers := []struct {
+			field string
+			value string
+		}{
+			{field: "node-completed event id", value: event.EventID},
+			{field: "node-completed execution id", value: event.ExecutionID},
+			{field: "node-completed effect id", value: event.EffectID},
+			{field: "node-completed node id", value: event.NodeID},
+		}
+		for _, identifier := range identifiers {
+			if err := validateIdentifier(identifier.field, identifier.value); err != nil {
+				return nil, err
+			}
+		}
+		output, err := payloadToABI(event.Output)
+		if err != nil {
+			return nil, fmt.Errorf("convert node-completed output: %w", err)
+		}
+		return abi.ExecutionEventNodeCompleted{Value: abi.NodeCompletedEvent{EventID: event.EventID, ExecutionID: event.ExecutionID, ExpectedRevision: event.ExpectedRevision, EffectID: event.EffectID, NodeID: event.NodeID, Output: output}}, nil
 	default:
 		return nil, fmt.Errorf("unsupported execution event %T", value)
 	}
+}
+
+func validateIdentifier(field, value string) error {
+	if value == "" {
+		return fmt.Errorf("%s must not be empty", field)
+	}
+	for _, character := range value {
+		if (character >= 'a' && character <= 'z') ||
+			(character >= 'A' && character <= 'Z') ||
+			(character >= '0' && character <= '9') ||
+			character == '.' || character == '_' || character == '-' {
+			continue
+		}
+		return fmt.Errorf("%s %q contains unsupported characters", field, value)
+	}
+	return nil
+}
+
+func validateFingerprint(field, value string) error {
+	if len(value) != 64 {
+		return fmt.Errorf("%s must contain exactly 64 hexadecimal characters", field)
+	}
+	for _, character := range value {
+		if (character >= 'a' && character <= 'f') || (character >= '0' && character <= '9') {
+			continue
+		}
+		return fmt.Errorf("%s must use lowercase hexadecimal encoding", field)
+	}
+	return nil
 }
 
 func transitionFromABI(value abi.TransitionResult) (Transition, error) {

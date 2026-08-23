@@ -14,7 +14,9 @@ Payload is an opaque media type and byte sequence. Kernel MUST NOT interpret its
 
 ## Identity and revision
 
-Every execution, event and effect has a stable identifier. `PlanReference` is the immutable tuple `(specification_version, workflow_id, fingerprint)`. `ExecutionStarted` MUST carry the exact reference of the executable plan, and every snapshot MUST retain that reference. Revision starts at one after `ExecutionStarted` and increases exactly once for every accepted completion event.
+Every execution, event and effect has a stable identifier. `ExecutionId` and `EffectId` MUST be globally unique. `EventId` MUST be unique within one Execution; the same textual EventId MAY be used by another Execution. Within an Execution, replaying the exact same event returns `AlreadyCommitted`, while reusing its EventId for different event content MUST fail with `event-identity-conflict`.
+
+`PlanReference` is the immutable tuple `(specification_version, workflow_id, fingerprint)`. `ExecutionStarted` MUST carry the exact reference of the executable plan. Every snapshot and store head MUST retain that same reference. Revision starts at one after `ExecutionStarted` and increases exactly once for every accepted completion event.
 
 An event log is bound by its first `ExecutionStarted` fact. Replay MUST verify that fact's complete `PlanReference` against the supplied plan before applying the first transition. A mismatch returns `plan-reference-mismatch`; callers cannot replay an event log against another workflow merely because its node IDs happen to match.
 
@@ -23,22 +25,23 @@ An event log is bound by its first `ExecutionStarted` fact. Replay MUST verify t
 The v0.1 `ExecuteNode` EffectId is `"effect-" + lower_hex(SHA-256(canonical_input))`, where `canonical_input` is the following byte sequence:
 
 ```text
-ASCII("flower.effect-id.v0.1") || 0x00
-|| U64_BE(byte_length(UTF8(execution_id))) || UTF8(execution_id)
-|| U64_BE(revision)
-|| U64_BE(byte_length(UTF8(node_id))) || UTF8(node_id)
+ASCII("flower/effect/v1")
+|| LP(ASCII("execute-node"))
+|| LP(UTF8(execution_id))
+|| LP(U64_BE(revision))
+|| LP(UTF8(node_id))
 ```
 
-Lengths count UTF-8 bytes, not characters. `U64_BE` is an unsigned 64-bit big-endian integer. The domain separator, length prefixes, byte order, `effect-` prefix and lowercase hexadecimal encoding are normative.
+`LP(value)` is `U64_BE(byte_length(value)) || value`. String lengths count UTF-8 bytes, not characters. `U64_BE` is an unsigned 64-bit big-endian integer. The domain separator has no terminator. The Effect kind, every derivation field, length prefixes, field order, byte order, `effect-` prefix and lowercase hexadecimal encoding are normative.
 
 Golden values:
 
 ```text
 (execution_id="tenant", revision=1, node_id="node.2.job")
-  -> effect-06c8f27d9de5825234bbf9754c13a557b394839002c05df3a7f7bb74af956655
+  -> effect-a2807a32336886e70797326d3a6e7645c30336c87f8932b8499bcefcc6899b29
 
 (execution_id="tenant.1.node", revision=2, node_id="job")
-  -> effect-156aba9fe41440419600d77ec482056ecfa03c671a3770c6d32d243fc4fe655e
+  -> effect-dc435cdd8f81eeeeb8f01981e8b2b9dbc2ce9efa1d223eb5d937b74ccb3d8965
 ```
 
 Kernel MUST NOT use delimiter concatenation, clocks, randomness, I/O or process-local state.
@@ -51,7 +54,11 @@ Completed executions reject all later events. Duplicate completions never emit a
 
 ## Persistence
 
-Host commit atomically stores the new snapshot, consumed event, new revision and Effect intents. Dispatch occurs only after commit. Stores use optimistic revision comparison. Replay validates the initial plan binding, then applies committed events in order through the same Kernel function.
+Host commit atomically stores one `ExecutionCommit`: the new snapshot, consumed event, new store head/revision and Effect intents. Dispatch occurs only after commit. Stores use optimistic revision comparison. An exact duplicate event returns `AlreadyCommitted` instead of an infrastructure error. Confirming an Effect absent from the execution outbox MUST fail.
+
+Outbox delivery is at-least-once. A dispatcher can exit after the external operation succeeds but before confirmation is persisted, so the same Effect can be delivered again. Every external executor MUST therefore be idempotent by the globally unique `EffectId`.
+
+Replay validates the initial plan binding before applying its first event, then applies committed events in order through the same Kernel function. The replayed snapshot, stored snapshot and stored head MUST agree on `PlanReference` and revision.
 
 ## Conformance fixtures
 

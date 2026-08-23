@@ -1,6 +1,7 @@
 use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Deserializer, Serialize, de};
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -70,6 +71,38 @@ define_identifier!(ExecutionId);
 define_identifier!(EventId);
 define_identifier!(EffectId);
 
+impl EffectId {
+    const DOMAIN_SEPARATOR: &'static [u8] = b"flower/effect/v1";
+    const EXECUTE_NODE_KIND: &'static [u8] = b"execute-node";
+
+    /// Derives the globally unique identity of one `ExecuteNode` intent.
+    ///
+    /// `execution_id` is required to be globally unique. The revision and node
+    /// identity distinguish the intents emitted by that execution.
+    pub fn derive_execute_node(
+        execution_id: &ExecutionId,
+        execution_revision: u64,
+        node_id: &NodeId,
+    ) -> Self {
+        let mut canonical_input = Sha256::new();
+        canonical_input.update(Self::DOMAIN_SEPARATOR);
+        update_length_prefixed(&mut canonical_input, Self::EXECUTE_NODE_KIND);
+        update_length_prefixed(&mut canonical_input, execution_id.as_str().as_bytes());
+        update_length_prefixed(&mut canonical_input, &execution_revision.to_be_bytes());
+        update_length_prefixed(&mut canonical_input, node_id.as_str().as_bytes());
+
+        let digest = canonical_input.finalize();
+        Self::new(format!("effect-{digest:x}"))
+            .expect("a SHA-256 effect identity always satisfies the identifier grammar")
+    }
+}
+
+fn update_length_prefixed(hasher: &mut Sha256, value: &[u8]) {
+    let length = u64::try_from(value.len()).expect("an in-memory identifier length fits into u64");
+    hasher.update(length.to_be_bytes());
+    hasher.update(value);
+}
+
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
 pub struct PlanFingerprint(String);
@@ -114,5 +147,19 @@ mod tests {
             NodeId::new("node/one"),
             Err(IdentifierError::UnsupportedCharacters { .. })
         ));
+    }
+
+    #[test]
+    fn execute_node_effect_identity_is_a_frozen_canonical_hash() {
+        let effect_id = EffectId::derive_execute_node(
+            &ExecutionId::new("01J6083Y8Y5P7FSJ6Z3K1Q9R4X").unwrap(),
+            42,
+            &NodeId::new("billing.capture").unwrap(),
+        );
+
+        assert_eq!(
+            effect_id.as_str(),
+            "effect-4a41a09004b033cf3ebd4f6d23f0b319e43f59325597a2bce666b264216888ac"
+        );
     }
 }

@@ -38,7 +38,7 @@ AwaitingNode + matching NodeCompleted
   -> or Completed + no effects
 ```
 
-Payload 是不透明的 `{ media_type, bytes }`。Kernel 不解析 JSON。Execution、Event 和 Effect 都有稳定身份；`ExecutionStarted` 与 snapshot 携带不可变 `PlanReference`。Effect ID 使用规范定义的域分隔、长度前缀 SHA-256 编码确定性推导，Kernel 不生成随机数。
+Payload 是不透明的 `{ media_type, bytes }`。Kernel 不解析 JSON。`ExecutionId` 与 `EffectId` 全局唯一，`EventId` 在单个 Execution 内唯一；`ExecutionStarted`、snapshot 与 store head 绑定同一个不可变 `PlanReference`。Effect ID 使用规范定义的域分隔、长度前缀 SHA-256 编码确定性推导，Kernel 不生成随机数。
 
 共享 fixture 位于 `spec/v0.1/fixtures`，格式由 `spec/v0.1/fixture-schema.json` 固定。Rust 与 Go Component runner 逐项比较完整 plan、diagnostics、snapshot、effects 和 error。
 

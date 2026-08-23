@@ -128,72 +128,135 @@ mod tests {
                 "duplicate fixture name {}",
                 fixture.name
             );
-            run_fixture(fixture);
+            assert!(fixture_matches(&fixture), "{}", fixture.name);
         }
     }
 
-    fn run_fixture(fixture: ConformanceFixture) {
-        match (compile(fixture.definition), fixture.expected_compile) {
-            (Ok(actual), CompileExpectation::Plan { plan: expected }) => {
-                assert_eq!(
-                    ExpectedPlan::from_plan(&actual),
-                    expected,
-                    "{} compile plan",
-                    fixture.name
+    #[test]
+    fn tampering_any_expected_fixture_value_is_detected() {
+        let fixture_directory =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../spec/v0.1/fixtures");
+        let mut paths = fs::read_dir(fixture_directory)
+            .expect("read fixture directory")
+            .map(|entry| entry.expect("read fixture entry").path())
+            .filter(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "json")
+            })
+            .collect::<Vec<_>>();
+        paths.sort();
+
+        for path in paths {
+            let source = fs::read(&path).expect("read fixture");
+            let document: serde_json::Value =
+                serde_json::from_slice(&source).expect("decode fixture JSON");
+            let mut expected_paths = Vec::new();
+            collect_json_paths(
+                &document["expected_compile"],
+                "/expected_compile",
+                &mut expected_paths,
+            );
+            for (index, step) in document["steps"]
+                .as_array()
+                .expect("steps must be an array")
+                .iter()
+                .enumerate()
+            {
+                collect_json_paths(
+                    &step["expected"],
+                    &format!("/steps/{index}/expected"),
+                    &mut expected_paths,
                 );
-                for (index, step) in fixture.steps.into_iter().enumerate() {
-                    let actual = transition(&actual, step.snapshot.as_ref(), step.event);
-                    match (actual, step.expected) {
-                        (Ok(actual), TransitionExpectation::Transition { snapshot, effects }) => {
-                            assert_eq!(
-                                actual.snapshot, snapshot,
-                                "{} step {index} snapshot",
-                                fixture.name
-                            );
-                            assert_eq!(
-                                actual.effects, effects,
-                                "{} step {index} effects",
-                                fixture.name
-                            );
+            }
+
+            for expected_path in expected_paths {
+                let mut tampered = document.clone();
+                tamper_json_value(
+                    tampered
+                        .pointer_mut(&expected_path)
+                        .expect("collected JSON path must exist"),
+                );
+                let detected = serde_json::from_value::<ConformanceFixture>(tampered)
+                    .map_or(true, |fixture| !fixture_matches(&fixture));
+                assert!(
+                    detected,
+                    "{} did not detect tampering at {expected_path}",
+                    path.display()
+                );
+            }
+        }
+    }
+
+    fn fixture_matches(fixture: &ConformanceFixture) -> bool {
+        match (
+            compile(fixture.definition.clone()),
+            &fixture.expected_compile,
+        ) {
+            (Ok(plan), CompileExpectation::Plan { plan: expected }) => {
+                ExpectedPlan::from_plan(&plan) == *expected
+                    && fixture.steps.iter().all(|step| {
+                        let actual = transition(&plan, step.snapshot.as_ref(), step.event.clone());
+                        match (actual, &step.expected) {
+                            (
+                                Ok(actual),
+                                TransitionExpectation::Transition { snapshot, effects },
+                            ) => actual.snapshot == *snapshot && actual.effects == *effects,
+                            (Err(actual), TransitionExpectation::Error { error }) => {
+                                actual.code() == error.code && actual.to_string() == error.message
+                            }
+                            _ => false,
                         }
-                        (Err(actual), TransitionExpectation::Error { error }) => {
-                            assert_eq!(
-                                actual.code(),
-                                error.code,
-                                "{} step {index} error code",
-                                fixture.name
-                            );
-                            assert_eq!(
-                                actual.to_string(),
-                                error.message,
-                                "{} step {index} error message",
-                                fixture.name
-                            );
-                        }
-                        (actual, expected) => panic!(
-                            "{} step {index}: actual {actual:?} does not match {expected:?}",
-                            fixture.name
-                        ),
-                    }
-                }
+                    })
             }
             (
                 Err(actual),
                 CompileExpectation::Diagnostics {
                     diagnostics: expected,
                 },
-            ) => {
-                assert_eq!(actual, expected, "{} compile diagnostics", fixture.name);
-                assert!(
-                    fixture.steps.is_empty(),
-                    "{} cannot transition without a plan",
-                    fixture.name
-                );
+            ) => actual == *expected && fixture.steps.is_empty(),
+            _ => false,
+        }
+    }
+
+    fn collect_json_paths(value: &serde_json::Value, path: &str, paths: &mut Vec<String>) {
+        paths.push(path.to_owned());
+        match value {
+            serde_json::Value::Object(fields) => {
+                for (name, child) in fields {
+                    let escaped_name = name.replace('~', "~0").replace('/', "~1");
+                    collect_json_paths(child, &format!("{path}/{escaped_name}"), paths);
+                }
             }
-            (actual, expected) => panic!(
-                "{} compile result {actual:?} does not match {expected:?}",
-                fixture.name
-            ),
+            serde_json::Value::Array(items) => {
+                for (index, child) in items.iter().enumerate() {
+                    collect_json_paths(child, &format!("{path}/{index}"), paths);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn tamper_json_value(value: &mut serde_json::Value) {
+        match value {
+            serde_json::Value::Null => *value = serde_json::Value::String("tampered".to_owned()),
+            serde_json::Value::Bool(current) => *current = !*current,
+            serde_json::Value::Number(current) => {
+                let current = current.as_u64().expect("fixture numbers are unsigned");
+                *value = serde_json::Value::from(current.saturating_add(1));
+            }
+            serde_json::Value::String(current) => {
+                if current.len() == 64 && current.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                    current.replace_range(..1, if current.starts_with('0') { "1" } else { "0" });
+                } else {
+                    current.push_str("-tampered");
+                }
+            }
+            serde_json::Value::Array(items) => {
+                items.push(items.first().cloned().unwrap_or(serde_json::Value::Null));
+            }
+            serde_json::Value::Object(fields) => {
+                fields.insert("__tampered".to_owned(), serde_json::Value::Bool(true));
+            }
         }
     }
 }

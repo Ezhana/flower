@@ -30,11 +30,15 @@ Node 之间的路由关系。Edge 可以根据已经持久化的结构化结果�
 
 ### Execution
 
-Workflow 或 Node 的一次逻辑执行，具有稳定 `ExecutionId`。进程重启、重试或 Worker 迁移不得改变该身份。
+Workflow 的一次逻辑执行，具有全局唯一且稳定的 `ExecutionId`。进程重启、节点推进、重试或 Worker 迁移不得改变该身份。
+
+### NodeActivation
+
+Execution 中某个 Node 的一次逻辑激活。循环或返工未来可以再次激活同一 Node，但必须创建新的 `NodeActivationId`。
 
 ### Attempt
 
-Execution 的一次具体尝试。重试创建新 Attempt，并保留之前 Attempt 的结果和错误，不能覆盖历史。
+NodeActivation 的一次实际执行尝试。首次执行也是 Attempt；成功和失败都是 Attempt 的结果。重试必须创建新的 `AttemptId` 和递增的 `AttemptNumber`，不能覆盖历史。
 
 ### State
 
@@ -44,9 +48,13 @@ Execution 的一次具体尝试。重试创建新 Attempt，并保留之前 Atte
 
 已经发生并被记录的事实，例如输入到达、Attempt 完成、人工给出 verdict 或外部调用返回。Event 推动状态转换，不表达尚未执行的愿望。
 
+`EventId` 的唯一作用域是单个 Execution。同一 Execution 内的同一 `EventId` 只能表示同一事实；完全相同的事实重投是幂等提交，内容不同则是身份冲突。
+
 ### Effect
 
 状态转换要求 Host 执行的外部操作，例如调度 Node、发送 HTTP 请求、创建 Executor、等待信号或取消执行。Effect 是意图；只有执行结果成为 Event 后，才是新的事实。
+
+`EffectId` 在所有 Execution 之间全局唯一。outbox 只提供 at-least-once 投递，因此外部执行器必须用 `EffectId` 去重，不能依赖进程内状态或“通常只调用一次”的假设。
 
 ### Artifact
 

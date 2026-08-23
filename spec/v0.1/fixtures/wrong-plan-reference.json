@@ -71,7 +71,7 @@
         "state": {
           "type": "awaiting-node",
           "node_id": "work",
-          "effect_id": "effect-9849c3522cdd5549e6b07a455bbecc7593a0466909f50f3546dbb0d43d126979",
+          "effect_id": "effect-82e47eba085b93e95b8940b97172e17041672627a17af6dd6bc82a10bf61f1e9",
           "input": {
             "media_type": "text/plain",
             "bytes": [
@@ -89,7 +89,7 @@
         "event_id": "event-1",
         "execution_id": "execution",
         "expected_revision": 1,
-        "effect_id": "effect-9849c3522cdd5549e6b07a455bbecc7593a0466909f50f3546dbb0d43d126979",
+        "effect_id": "effect-82e47eba085b93e95b8940b97172e17041672627a17af6dd6bc82a10bf61f1e9",
         "node_id": "work",
         "output": {
           "media_type": "text/plain",

@@ -2,7 +2,6 @@ use flower_plan::{
     EffectId, EventId, ExecutableWorkflowPlan, ExecutionId, NodeId, NodeKind, PlanReference,
 };
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -200,7 +199,11 @@ pub fn validate_snapshot(
                 .ok_or(TransitionError::InvalidSnapshot)?;
             if &expected_node.id != node_id
                 || *effect_id
-                    != derive_effect_id(&snapshot.execution_id, snapshot.revision, node_id)
+                    != EffectId::derive_execute_node(
+                        &snapshot.execution_id,
+                        snapshot.revision.0,
+                        node_id,
+                    )
             {
                 return Err(TransitionError::InvalidSnapshot);
             }
@@ -305,7 +308,7 @@ fn awaiting_transition(
     node_id: NodeId,
     input: Payload,
 ) -> Result<Transition, TransitionError> {
-    let effect_id = derive_effect_id(&execution_id, revision, &node_id);
+    let effect_id = EffectId::derive_execute_node(&execution_id, revision.0, &node_id);
     let effect = ExecutionEffect::ExecuteNode {
         effect_id: effect_id.clone(),
         execution_id: execution_id.clone(),
@@ -342,29 +345,6 @@ fn completed_transition(
         },
         effects: Vec::new(),
     }
-}
-
-pub fn derive_effect_id(
-    execution_id: &ExecutionId,
-    revision: ExecutionRevision,
-    node_id: &NodeId,
-) -> EffectId {
-    const DOMAIN_SEPARATOR: &[u8] = b"flower.effect-id.v0.1\0";
-
-    let mut canonical = Sha256::new();
-    canonical.update(DOMAIN_SEPARATOR);
-    hash_length_prefixed(&mut canonical, execution_id.as_str().as_bytes());
-    canonical.update(revision.0.to_be_bytes());
-    hash_length_prefixed(&mut canonical, node_id.as_str().as_bytes());
-    let digest = canonical.finalize();
-    EffectId::new(format!("effect-{digest:x}"))
-        .expect("a SHA-256 effect id always satisfies the identifier grammar")
-}
-
-fn hash_length_prefixed(hasher: &mut Sha256, value: &[u8]) {
-    let length = u64::try_from(value.len()).expect("identifier length fits into u64");
-    hasher.update(length.to_be_bytes());
-    hasher.update(value);
 }
 
 #[cfg(test)]
@@ -594,16 +574,16 @@ mod tests {
 
     #[test]
     fn effect_ids_use_unambiguous_domain_separated_encoding() {
-        let first = derive_effect_id(&id("tenant"), ExecutionRevision(1), &id("node.2.job"));
-        let second = derive_effect_id(&id("tenant.1.node"), ExecutionRevision(2), &id("job"));
+        let first = EffectId::derive_execute_node(&id("tenant"), 1, &id("node.2.job"));
+        let second = EffectId::derive_execute_node(&id("tenant.1.node"), 2, &id("job"));
 
         assert_eq!(
             first.as_str(),
-            "effect-06c8f27d9de5825234bbf9754c13a557b394839002c05df3a7f7bb74af956655"
+            "effect-a2807a32336886e70797326d3a6e7645c30336c87f8932b8499bcefcc6899b29"
         );
         assert_eq!(
             second.as_str(),
-            "effect-156aba9fe41440419600d77ec482056ecfa03c671a3770c6d32d243fc4fe655e"
+            "effect-dc435cdd8f81eeeeb8f01981e8b2b9dbc2ce9efa1d223eb5d937b74ccb3d8965"
         );
         assert_ne!(first, second);
     }

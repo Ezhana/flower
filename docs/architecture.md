@@ -42,7 +42,9 @@ load snapshot
 -> repeat
 ```
 
-`flower-store-memory` 通过 optimistic revision 检查模拟并发冲突，并把 snapshot、event 与 outbox 放在同一临界区提交。Effect dispatch 与 outbox 确认分离，进程可在任意一侧退出后恢复；外部执行器必须按 EffectId 幂等。
+Host 把一次推进封装为单一 `ExecutionCommit`，Store 原子写入 store head、snapshot、event 与 outbox。`flower-store-memory` 通过 optimistic revision 检查模拟并发冲突。完全相同的 event 重投返回 `AlreadyCommitted`；同一 Execution 内复用 `EventId` 表示不同事实则拒绝。
+
+Effect dispatch 与 outbox 确认分离，语义是 at-least-once：进程可能在外部执行成功后、确认写入前退出并导致重投。确认不存在的 Effect 必须报错；外部执行器必须按全局 `EffectId` 幂等。
 
 ## Component 与 Go
 

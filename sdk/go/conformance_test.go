@@ -123,23 +123,66 @@ func TestComponentExecutesEverySharedFixtureExpectation(t *testing.T) {
 	}
 }
 
-func TestCompileRejectsInvalidPublicNodeKindBeforeABI(t *testing.T) {
+func TestCompileReturnsPublicToABIConversionErrors(t *testing.T) {
 	engine := &componentEngine{}
 	_, diagnostics, err := engine.Compile(context.Background(), WorkflowDefinition{
 		ID:    "invalid-sdk-input",
 		Nodes: []NodeDefinition{{ID: "bad", Kind: NodeKind("gateway")}},
 	})
-	if err != nil {
-		t.Fatalf("Compile returned transport error: %v", err)
+	if err == nil || err.Error() != `convert definition.nodes[0] "bad": unsupported node kind "gateway"` {
+		t.Fatalf("Compile error = %v", err)
 	}
-	wantSubject := "bad"
-	want := []Diagnostic{{
-		Code:    "invalid-node-kind",
-		Message: "node \"bad\": unsupported node kind \"gateway\"",
-		Subject: &wantSubject,
-	}}
-	if !reflect.DeepEqual(diagnostics, want) {
-		t.Fatalf("diagnostics = %#v, want %#v", diagnostics, want)
+	if diagnostics != nil {
+		t.Fatalf("diagnostics = %#v, want nil", diagnostics)
+	}
+}
+
+func TestTamperingAnyExpectedJSONValueChangesTheTypedExpectation(t *testing.T) {
+	paths, err := filepath.Glob(filepath.Join("..", "..", "spec", "v0.1", "fixtures", "*.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(paths)
+	for _, path := range paths {
+		source, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		original, err := decodeFixtureBytes(source)
+		if err != nil {
+			t.Fatalf("decode %s: %v", path, err)
+		}
+		var document map[string]any
+		if err := json.Unmarshal(source, &document); err != nil {
+			t.Fatal(err)
+		}
+		var expectedPaths [][]any
+		collectJSONPaths(document["expected_compile"], []any{"expected_compile"}, &expectedPaths)
+		for index, step := range document["steps"].([]any) {
+			collectJSONPaths(step.(map[string]any)["expected"], []any{"steps", index, "expected"}, &expectedPaths)
+		}
+
+		for _, expectedPath := range expectedPaths {
+			clonedBytes, err := json.Marshal(document)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var tamperedDocument map[string]any
+			if err := json.Unmarshal(clonedBytes, &tamperedDocument); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := tamperJSONAtPath(tamperedDocument, expectedPath); err != nil {
+				t.Fatalf("tamper %s at %v: %v", path, expectedPath, err)
+			}
+			tamperedBytes, err := json.Marshal(tamperedDocument)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tampered, err := decodeFixtureBytes(tamperedBytes)
+			if err == nil && reflect.DeepEqual(tampered.ExpectedCompile, original.ExpectedCompile) && reflect.DeepEqual(tampered.Steps, original.Steps) {
+				t.Fatalf("%s did not retain tampering at %v", path, expectedPath)
+			}
+		}
 	}
 }
 
@@ -149,17 +192,109 @@ func decodeFixture(t *testing.T, path string) conformanceFixture {
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)
 	}
+	fixture, err := decodeFixtureBytes(data)
+	if err != nil {
+		t.Fatalf("decode %s: %v", path, err)
+	}
+	return fixture
+}
+
+func decodeFixtureBytes(data []byte) (conformanceFixture, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	var fixture conformanceFixture
 	if err := decoder.Decode(&fixture); err != nil {
-		t.Fatalf("decode %s: %v", path, err)
+		return conformanceFixture{}, err
 	}
 	var trailing any
 	if err := decoder.Decode(&trailing); err != io.EOF {
-		t.Fatalf("decode %s: trailing JSON value", path)
+		return conformanceFixture{}, fmt.Errorf("trailing JSON value")
 	}
-	return fixture
+	return fixture, nil
+}
+
+func collectJSONPaths(value any, path []any, paths *[][]any) {
+	*paths = append(*paths, append([]any(nil), path...))
+	switch current := value.(type) {
+	case map[string]any:
+		names := make([]string, 0, len(current))
+		for name := range current {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			collectJSONPaths(current[name], append(path, name), paths)
+		}
+	case []any:
+		for index, child := range current {
+			collectJSONPaths(child, append(path, index), paths)
+		}
+	}
+}
+
+func tamperJSONAtPath(value any, path []any) (any, error) {
+	if len(path) == 0 {
+		return tamperJSONValue(value), nil
+	}
+	switch segment := path[0].(type) {
+	case string:
+		object, ok := value.(map[string]any)
+		if !ok {
+			return nil, fmt.Errorf("expected object before field %q", segment)
+		}
+		child, exists := object[segment]
+		if !exists {
+			return nil, fmt.Errorf("field %q does not exist", segment)
+		}
+		mutated, err := tamperJSONAtPath(child, path[1:])
+		if err != nil {
+			return nil, err
+		}
+		object[segment] = mutated
+		return object, nil
+	case int:
+		array, ok := value.([]any)
+		if !ok || segment < 0 || segment >= len(array) {
+			return nil, fmt.Errorf("array index %d does not exist", segment)
+		}
+		mutated, err := tamperJSONAtPath(array[segment], path[1:])
+		if err != nil {
+			return nil, err
+		}
+		array[segment] = mutated
+		return array, nil
+	default:
+		return nil, fmt.Errorf("unsupported path segment %T", segment)
+	}
+}
+
+func tamperJSONValue(value any) any {
+	switch current := value.(type) {
+	case nil:
+		return "tampered"
+	case bool:
+		return !current
+	case float64:
+		return current + 1
+	case string:
+		if len(current) == 64 {
+			if current[0] == '0' {
+				return "1" + current[1:]
+			}
+			return "0" + current[1:]
+		}
+		return current + "-tampered"
+	case []any:
+		if len(current) == 0 {
+			return append(current, nil)
+		}
+		return append(current, current[0])
+	case map[string]any:
+		current["__tampered"] = true
+		return current
+	default:
+		panic(fmt.Sprintf("unsupported JSON value %T", value))
+	}
 }
 
 func runFixture(ctx context.Context, t *testing.T, engine Engine, fixture conformanceFixture) {
