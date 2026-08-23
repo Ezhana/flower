@@ -15,3 +15,6 @@ yaml_serde = "0.10"
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 wit-bindgen = "0.47"
+sha2 = "0.10"
+wasmparser = "0.240"
+wit-component = "0.240"

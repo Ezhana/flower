@@ -1,0 +1,44 @@
+{
+  "schema_version": "flower.conformance/v0.1",
+  "name": "disconnected-node",
+  "definition": {
+    "id": "invalid",
+    "nodes": [
+      {
+        "id": "start",
+        "kind": "start"
+      },
+      {
+        "id": "orphan",
+        "kind": "activity"
+      },
+      {
+        "id": "finish",
+        "kind": "finish"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "start",
+        "target": "finish"
+      },
+      {
+        "id": "e2",
+        "source": "orphan",
+        "target": "orphan"
+      }
+    ]
+  },
+  "expected_compile": {
+    "outcome": "diagnostics",
+    "diagnostics": [
+      {
+        "code": "disconnected-node",
+        "message": "node `orphan` is disconnected",
+        "subject": "orphan"
+      }
+    ]
+  },
+  "steps": []
+}

@@ -15,7 +15,7 @@ Flower Specification 由三个缺一不可的部分构成。仅有 schema、文�
 
 它必须可解析、可验证、可版本化，并能生成 schema、binding 和测试 fixture。模型应保持声明式、有限且非图灵完备。
 
-YAML 只是第一种候选输入格式。解析后的规范化 IR 才能被 Compiler、Runtime 和生成器共同使用。
+YAML 只是后续候选输入格式。Compiler 输出的 `ExecutableWorkflowPlan` 才能被 Kernel、Component 和 Host 使用。
 
 ## 2. Normative semantics
 
@@ -37,7 +37,7 @@ YAML 只是第一种候选输入格式。解析后的规范化 IR 才能被 Comp
 6. 外部副作用的请求与结果 **MUST** 可关联，重放 **MUST NOT** 默认重复执行已确认的副作用；
 7. Binding **MUST NOT** 改变公共 Value、Error 或 State 的含义。
 
-这些条款仍需在语义核心阶段补全并通过 ADR 审核。
+v0.1 已冻结线性成功路径；失败、Attempt、重试与取消条款仍待后续版本补全。
 
 ## 3. Conformance suite
 
@@ -53,7 +53,7 @@ And    the execution ends as Failed
 
 测试至少覆盖：
 
-- Value 编解码与边界值；
+- 不透明 Payload 编解码与边界值；
 - 合法和非法状态转换；
 - 重试、取消和超时；
 - Effect 去重与恢复；

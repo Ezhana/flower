@@ -1,0 +1,58 @@
+{
+  "schema_version": "flower.conformance/v0.1",
+  "name": "branching-without-gateway",
+  "definition": {
+    "id": "invalid",
+    "nodes": [
+      {
+        "id": "start",
+        "kind": "start"
+      },
+      {
+        "id": "one",
+        "kind": "activity"
+      },
+      {
+        "id": "two",
+        "kind": "activity"
+      },
+      {
+        "id": "finish",
+        "kind": "finish"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "start",
+        "target": "one"
+      },
+      {
+        "id": "e2",
+        "source": "start",
+        "target": "two"
+      },
+      {
+        "id": "e3",
+        "source": "one",
+        "target": "finish"
+      },
+      {
+        "id": "e4",
+        "source": "two",
+        "target": "finish"
+      }
+    ]
+  },
+  "expected_compile": {
+    "outcome": "diagnostics",
+    "diagnostics": [
+      {
+        "code": "branching-without-gateway",
+        "message": "node `finish` has 2 incoming edges; expected 1",
+        "subject": "finish"
+      }
+    ]
+  },
+  "steps": []
+}

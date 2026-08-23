@@ -1,0 +1,93 @@
+{
+  "schema_version": "flower.conformance/v0.1",
+  "name": "wrong-start-plan-reference",
+  "definition": {
+    "id": "bound",
+    "nodes": [
+      {
+        "id": "start",
+        "kind": "start"
+      },
+      {
+        "id": "work",
+        "kind": "activity"
+      },
+      {
+        "id": "finish",
+        "kind": "finish"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "start",
+        "target": "work"
+      },
+      {
+        "id": "e2",
+        "source": "work",
+        "target": "finish"
+      }
+    ]
+  },
+  "expected_compile": {
+    "outcome": "plan",
+    "plan": {
+      "specification_version": {
+        "major": 0,
+        "minor": 1
+      },
+      "workflow_id": "bound",
+      "fingerprint": "18d54416ad7d4731369845852058f23322d9bbf5cdb04ddb1167f402fd3ac36b",
+      "nodes": [
+        {
+          "id": "start",
+          "kind": "start"
+        },
+        {
+          "id": "work",
+          "kind": "activity"
+        },
+        {
+          "id": "finish",
+          "kind": "finish"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "snapshot": null,
+      "event": {
+        "type": "execution-started",
+        "event_id": "start-event",
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 1
+          },
+          "workflow_id": "different",
+          "fingerprint": "18d54416ad7d4731369845852058f23322d9bbf5cdb04ddb1167f402fd3ac36b"
+        },
+        "input": {
+          "media_type": "text/plain",
+          "bytes": [
+            105,
+            110,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "plan-reference-mismatch",
+          "message": "execution plan reference does not match executable plan"
+        }
+      }
+    }
+  ]
+}

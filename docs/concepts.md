@@ -54,11 +54,9 @@ Execution 的一次具体尝试。重试创建新 Attempt，并保留之前 Atte
 
 ## 合同层
 
-### Value
+### Payload
 
-跨语言公共数据模型。候选类型包括 Null、Boolean、SignedInteger、UnsignedInteger、Float、Decimal、String、Bytes、List、Record、Timestamp 和 Duration。
-
-每个 binding 可以选择自然的语言表示，但不得因为某种 binding 表达不便而偷偷改变公共语义。精度、范围、排序和序列化规则必须由后续规范明确。
+v0.1 只定义不透明的 `media_type + bytes`。Kernel 负责传递而不解析业务字段。JSON、CBOR 或领域 verdict 由 media type 标识；gateway 未来使用显式 RouteDecision，不能在 Kernel 中对任意 JSON 执行表达式。
 
 ### ExecutionError
 

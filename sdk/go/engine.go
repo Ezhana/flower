@@ -6,326 +6,281 @@ import (
 	"io"
 	"sync"
 
-	"github.com/partite-ai/wacogo"
+	"flower.dev/sdk/go/internal/componentabi"
+	abi "flower.dev/sdk/go/internal/componentabi/flower/engine/workflowengine"
 )
 
-type NodeKind uint8
-
-const (
-	StartNode NodeKind = iota
-	ActivityNode
-	FinishNode
-)
-
-type NodeDefinition struct {
-	ID   string
-	Kind NodeKind
+type Engine interface {
+	Compile(context.Context, WorkflowDefinition) (ExecutableWorkflowPlan, []Diagnostic, error)
+	Transition(context.Context, ExecutableWorkflowPlan, *ExecutionSnapshot, ExecutionEvent) (Transition, error)
+	Close(context.Context) error
 }
 
-type EdgeDefinition struct {
-	ID     string
-	Source string
-	Target string
+type componentEngine struct {
+	client *componentabi.Client
+	mu     sync.Mutex
+	closed bool
 }
 
-type WorkflowDefinition struct {
-	ID    string
-	Nodes []NodeDefinition
-	Edges []EdgeDefinition
-}
-
-type ExecutionStatus uint8
-
-const (
-	ExecutionRunning ExecutionStatus = iota
-	ExecutionCompleted
-)
-
-type ExecutionSnapshot struct {
-	WorkflowID       string
-	Status           ExecutionStatus
-	PendingNodeID    *string
-	CurrentValue     string
-	CompletedNodeIDs []string
-}
-
-type ExecuteNodeEffect struct {
-	NodeID string
-	Input  string
-}
-
-type Transition struct {
-	Snapshot ExecutionSnapshot
-	Effects  []ExecuteNodeEffect
-}
-
-type EngineError struct {
-	Code    string
-	Message string
-}
-
-func (e *EngineError) Error() string {
-	return fmt.Sprintf("flower engine %s: %s", e.Code, e.Message)
-}
-
-// Engine owns one non-reentrant Component instance and serializes calls to it.
-type Engine struct {
-	runtime  *wacogo.Engine
-	instance *wacogo.ComponentInstance
-	api      *wacogo.ComponentInstance
-	mu       sync.Mutex
-}
-
-func LoadEngine(ctx context.Context, component io.Reader) (*Engine, error) {
-	runtime := wacogo.NewEngine(ctx)
-	compiled, err := runtime.LoadComponent(ctx, component)
+func LoadEngine(ctx context.Context, component io.Reader) (Engine, error) {
+	client, err := componentabi.Load(ctx, component)
 	if err != nil {
-		_ = runtime.Close(ctx)
-		return nil, fmt.Errorf("load flower component: %w", err)
+		return nil, err
 	}
-	instance, err := compiled.Instantiate(ctx)
-	if err != nil {
-		_ = runtime.Close(ctx)
-		return nil, fmt.Errorf("instantiate flower component: %w", err)
-	}
-	api := instance.ExportedInstance("flower:engine/workflow-engine@0.1.0")
-	if api == nil {
-		_ = instance.Close(ctx)
-		_ = runtime.Close(ctx)
-		return nil, fmt.Errorf("flower component does not export workflow-engine@0.1.0")
-	}
-	return &Engine{runtime: runtime, instance: instance, api: api}, nil
+	return &componentEngine{client: client}, nil
 }
 
-func (e *Engine) Close(ctx context.Context) error {
+func (e *componentEngine) Close(ctx context.Context) error {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.instance == nil {
+	if e.closed {
 		return nil
 	}
-	instanceErr := e.instance.Close(ctx)
-	runtimeErr := e.runtime.Close(ctx)
-	e.instance = nil
-	if instanceErr != nil {
-		return fmt.Errorf("close flower component instance: %w", instanceErr)
+	err := e.client.Close(ctx)
+	if err == nil {
+		e.closed = true
 	}
-	if runtimeErr != nil {
-		return fmt.Errorf("close flower component runtime: %w", runtimeErr)
-	}
-	return nil
+	return err
 }
 
-func (e *Engine) Start(
-	ctx context.Context,
-	workflow WorkflowDefinition,
-	input string,
-) (Transition, error) {
-	return e.call(ctx, "start", workflowValue(workflow), wacogo.ValString(input))
-}
-
-func (e *Engine) CompleteNode(
-	ctx context.Context,
-	workflow WorkflowDefinition,
-	snapshot ExecutionSnapshot,
-	nodeID string,
-	output string,
-) (Transition, error) {
-	return e.call(
-		ctx,
-		"complete-node",
-		workflowValue(workflow),
-		snapshotValue(snapshot),
-		wacogo.ValString(nodeID),
-		wacogo.ValString(output),
-	)
-}
-
-func (e *Engine) call(ctx context.Context, name string, arguments ...wacogo.Val) (Transition, error) {
+func (e *componentEngine) Compile(ctx context.Context, definition WorkflowDefinition) (ExecutableWorkflowPlan, []Diagnostic, error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.instance == nil {
+	if e.closed {
+		return ExecutableWorkflowPlan{}, nil, fmt.Errorf("flower engine is closed")
+	}
+	abiDefinition, diagnostics := definitionToABI(definition)
+	if len(diagnostics) != 0 {
+		return ExecutableWorkflowPlan{}, diagnostics, nil
+	}
+	result, err := e.client.Compile(ctx, abiDefinition)
+	if err != nil {
+		return ExecutableWorkflowPlan{}, nil, fmt.Errorf("compile workflow component call: %w", err)
+	}
+	switch value := result.(type) {
+	case abi.ResultExecutableWorkflowPlanListDiagnosticOk:
+		plan, err := planFromABI(value.Value)
+		return plan, nil, err
+	case abi.ResultExecutableWorkflowPlanListDiagnosticErr:
+		diagnostics := make([]Diagnostic, len(value.Value))
+		for index, diagnostic := range value.Value {
+			var subject *string
+			if diagnostic.Subject.IsSome {
+				copy := diagnostic.Subject.Value
+				subject = &copy
+			}
+			diagnostics[index] = Diagnostic{Code: diagnostic.Code, Message: diagnostic.Message, Subject: subject}
+		}
+		return ExecutableWorkflowPlan{}, diagnostics, nil
+	default:
+		return ExecutableWorkflowPlan{}, nil, fmt.Errorf("component returned unknown compile result %T", result)
+	}
+}
+
+func (e *componentEngine) Transition(ctx context.Context, plan ExecutableWorkflowPlan, snapshot *ExecutionSnapshot, event ExecutionEvent) (Transition, error) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.closed {
 		return Transition{}, fmt.Errorf("flower engine is closed")
 	}
-	function := e.api.ExportedFunc(name)
-	if function == nil {
-		return Transition{}, fmt.Errorf("flower component does not export %q", name)
-	}
-	results, err := function.Call(ctx, arguments...)
-	if err != nil {
-		return Transition{}, fmt.Errorf("call flower component %q: %w", name, err)
-	}
-	if len(results) != 1 {
-		return Transition{}, fmt.Errorf("flower component %q returned %d values, expected 1", name, len(results))
-	}
-	result, ok := results[0].(*wacogo.ValResult)
-	if !ok {
-		return Transition{}, unexpectedValue("engine result", results[0])
-	}
-	if !result.IsOk() {
-		return Transition{}, decodeEngineError(result.Err())
-	}
-	return decodeTransition(result.Ok())
-}
-
-func workflowValue(workflow WorkflowDefinition) wacogo.Val {
-	nodes := make([]*wacogo.ValRecord, 0, len(workflow.Nodes))
-	for _, node := range workflow.Nodes {
-		nodes = append(nodes, wacogo.NewValRecord(
-			wacogo.Field{Name: "id", Val: wacogo.ValString(node.ID)},
-			wacogo.Field{Name: "kind", Val: wacogo.NewValEnum(uint32(node.Kind))},
-		))
-	}
-	edges := make([]*wacogo.ValRecord, 0, len(workflow.Edges))
-	for _, edge := range workflow.Edges {
-		edges = append(edges, wacogo.NewValRecord(
-			wacogo.Field{Name: "id", Val: wacogo.ValString(edge.ID)},
-			wacogo.Field{Name: "source", Val: wacogo.ValString(edge.Source)},
-			wacogo.Field{Name: "target", Val: wacogo.ValString(edge.Target)},
-		))
-	}
-	return wacogo.NewValRecord(
-		wacogo.Field{Name: "id", Val: wacogo.ValString(workflow.ID)},
-		wacogo.Field{Name: "nodes", Val: wacogo.NewValListOf(nodes...)},
-		wacogo.Field{Name: "edges", Val: wacogo.NewValListOf(edges...)},
-	)
-}
-
-func snapshotValue(snapshot ExecutionSnapshot) wacogo.Val {
-	pendingNodeID := wacogo.ValOptionNone()
-	if snapshot.PendingNodeID != nil {
-		pendingNodeID = wacogo.ValOptionSome(wacogo.ValString(*snapshot.PendingNodeID))
-	}
-	completedNodeIDs := make([]wacogo.ValString, 0, len(snapshot.CompletedNodeIDs))
-	for _, nodeID := range snapshot.CompletedNodeIDs {
-		completedNodeIDs = append(completedNodeIDs, wacogo.ValString(nodeID))
-	}
-	return wacogo.NewValRecord(
-		wacogo.Field{Name: "workflow-id", Val: wacogo.ValString(snapshot.WorkflowID)},
-		wacogo.Field{Name: "status", Val: wacogo.NewValEnum(uint32(snapshot.Status))},
-		wacogo.Field{Name: "pending-node-id", Val: pendingNodeID},
-		wacogo.Field{Name: "current-value", Val: wacogo.ValString(snapshot.CurrentValue)},
-		wacogo.Field{
-			Name: "completed-node-ids",
-			Val:  wacogo.NewValListOf(completedNodeIDs...),
-		},
-	)
-}
-
-func decodeTransition(value wacogo.Val) (Transition, error) {
-	record, ok := value.(*wacogo.ValRecord)
-	if !ok {
-		return Transition{}, unexpectedValue("transition", value)
-	}
-	snapshot, err := decodeSnapshot(record.Field("snapshot"))
-	if err != nil {
-		return Transition{}, err
-	}
-	effectValues, ok := record.Field("effects").(*wacogo.ValList)
-	if !ok {
-		return Transition{}, unexpectedValue("transition.effects", record.Field("effects"))
-	}
-	effects := make([]ExecuteNodeEffect, 0, effectValues.Len())
-	for index := range effectValues.Len() {
-		effect, err := decodeEffect(effectValues.Get(index))
+	abiSnapshot := abi.NoneExecutionSnapshot()
+	if snapshot != nil {
+		converted, err := snapshotToABI(*snapshot)
 		if err != nil {
 			return Transition{}, err
 		}
-		effects = append(effects, effect)
+		abiSnapshot = abi.SomeExecutionSnapshot(converted)
 	}
-	return Transition{Snapshot: snapshot, Effects: effects}, nil
+	abiEvent, err := eventToABI(event)
+	if err != nil {
+		return Transition{}, err
+	}
+	abiPlan, err := planToABI(plan)
+	if err != nil {
+		return Transition{}, err
+	}
+	result, err := e.client.Transition(ctx, abiPlan, abiSnapshot, abiEvent)
+	if err != nil {
+		return Transition{}, fmt.Errorf("transition component call: %w", err)
+	}
+	switch value := result.(type) {
+	case abi.ResultTransitionResultEngineErrorOk:
+		return transitionFromABI(value.Value)
+	case abi.ResultTransitionResultEngineErrorErr:
+		return Transition{}, &EngineError{Code: value.Value.Code, Message: value.Value.Message}
+	default:
+		return Transition{}, fmt.Errorf("component returned unknown transition result %T", result)
+	}
 }
 
-func decodeSnapshot(value wacogo.Val) (ExecutionSnapshot, error) {
-	record, ok := value.(*wacogo.ValRecord)
-	if !ok {
-		return ExecutionSnapshot{}, unexpectedValue("execution snapshot", value)
-	}
-	workflowID, err := stringField(record, "workflow-id")
-	if err != nil {
-		return ExecutionSnapshot{}, err
-	}
-	statusValue, ok := record.Field("status").(*wacogo.ValEnum)
-	if !ok {
-		return ExecutionSnapshot{}, unexpectedValue("execution-snapshot.status", record.Field("status"))
-	}
-	pendingValue, ok := record.Field("pending-node-id").(*wacogo.ValOption)
-	if !ok {
-		return ExecutionSnapshot{}, unexpectedValue("execution-snapshot.pending-node-id", record.Field("pending-node-id"))
-	}
-	var pendingNodeID *string
-	if !pendingValue.IsNone() {
-		value, ok := pendingValue.Val().(wacogo.ValString)
-		if !ok {
-			return ExecutionSnapshot{}, unexpectedValue("execution-snapshot.pending-node-id.some", pendingValue.Val())
+func definitionToABI(value WorkflowDefinition) (abi.WorkflowDefinition, []Diagnostic) {
+	nodes := make([]abi.NodeDefinition, len(value.Nodes))
+	for index, node := range value.Nodes {
+		kind, err := nodeKindToABI(node.Kind)
+		if err != nil {
+			subject := node.ID
+			return abi.WorkflowDefinition{}, []Diagnostic{{
+				Code:    "invalid-node-kind",
+				Message: fmt.Sprintf("node %q: %v", node.ID, err),
+				Subject: &subject,
+			}}
 		}
-		stringValue := string(value)
-		pendingNodeID = &stringValue
+		nodes[index] = abi.NodeDefinition{ID: node.ID, Kind: kind}
 	}
-	currentValue, err := stringField(record, "current-value")
-	if err != nil {
-		return ExecutionSnapshot{}, err
+	edges := make([]abi.EdgeDefinition, len(value.Edges))
+	for index, edge := range value.Edges {
+		edges[index] = abi.EdgeDefinition{ID: edge.ID, Source: edge.Source, Target: edge.Target}
 	}
-	completedValues, ok := record.Field("completed-node-ids").(*wacogo.ValList)
-	if !ok {
-		return ExecutionSnapshot{}, unexpectedValue("execution-snapshot.completed-node-ids", record.Field("completed-node-ids"))
+	return abi.WorkflowDefinition{ID: value.ID, Nodes: nodes, Edges: edges}, nil
+}
+
+func nodeKindToABI(value NodeKind) (abi.NodeKind, error) {
+	switch value {
+	case StartNode:
+		return abi.NodeKindStart, nil
+	case ActivityNode:
+		return abi.NodeKindActivity, nil
+	case FinishNode:
+		return abi.NodeKindFinish, nil
+	default:
+		return 0, fmt.Errorf("unsupported node kind %q", value)
 	}
-	completedNodeIDs := make([]string, 0, completedValues.Len())
-	for index := range completedValues.Len() {
-		value, ok := completedValues.Get(index).(wacogo.ValString)
-		if !ok {
-			return ExecutionSnapshot{}, unexpectedValue("execution-snapshot.completed-node-ids item", completedValues.Get(index))
+}
+func nodeKindFromABI(value abi.NodeKind) (NodeKind, error) {
+	switch value {
+	case abi.NodeKindStart:
+		return StartNode, nil
+	case abi.NodeKindActivity:
+		return ActivityNode, nil
+	case abi.NodeKindFinish:
+		return FinishNode, nil
+	default:
+		return "", fmt.Errorf("component returned unknown node-kind discriminant %d", value)
+	}
+}
+
+func planToABI(value ExecutableWorkflowPlan) (abi.ExecutableWorkflowPlan, error) {
+	nodes := make([]abi.PlanNode, len(value.Nodes))
+	for index, node := range value.Nodes {
+		kind, err := nodeKindToABI(node.Kind)
+		if err != nil {
+			return abi.ExecutableWorkflowPlan{}, fmt.Errorf(
+				"invalid executable plan node %q: %w",
+				node.ID,
+				err,
+			)
 		}
-		completedNodeIDs = append(completedNodeIDs, string(value))
+		nodes[index] = abi.PlanNode{ID: node.ID, Kind: kind}
 	}
-	return ExecutionSnapshot{
-		WorkflowID:       workflowID,
-		Status:           ExecutionStatus(statusValue.Discriminant()),
-		PendingNodeID:    pendingNodeID,
-		CurrentValue:     currentValue,
-		CompletedNodeIDs: completedNodeIDs,
+	return abi.ExecutableWorkflowPlan{SpecificationVersion: abi.SpecificationVersion{Major: value.SpecificationVersion.Major, Minor: value.SpecificationVersion.Minor}, WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint, Nodes: nodes}, nil
+}
+
+func planFromABI(value abi.ExecutableWorkflowPlan) (ExecutableWorkflowPlan, error) {
+	nodes := make([]PlanNode, len(value.Nodes))
+	for index, node := range value.Nodes {
+		kind, err := nodeKindFromABI(node.Kind)
+		if err != nil {
+			return ExecutableWorkflowPlan{}, fmt.Errorf("decode plan.nodes[%d]: %w", index, err)
+		}
+		nodes[index] = PlanNode{ID: node.ID, Kind: kind}
+	}
+	return ExecutableWorkflowPlan{SpecificationVersion: SpecificationVersion{Major: value.SpecificationVersion.Major, Minor: value.SpecificationVersion.Minor}, WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint, Nodes: nodes}, nil
+}
+
+func payloadToABI(value Payload) abi.Payload {
+	return abi.Payload{MediaType: value.MediaType, Bytes: append([]byte(nil), value.Bytes...)}
+}
+func payloadFromABI(value abi.Payload) Payload {
+	return Payload{MediaType: value.MediaType, Bytes: append([]byte(nil), value.Bytes...)}
+}
+
+func planReferenceToABI(value PlanReference) abi.PlanReference {
+	return abi.PlanReference{
+		SpecificationVersion: abi.SpecificationVersion{
+			Major: value.SpecificationVersion.Major,
+			Minor: value.SpecificationVersion.Minor,
+		},
+		WorkflowID:  value.WorkflowID,
+		Fingerprint: value.Fingerprint,
+	}
+}
+
+func planReferenceFromABI(value abi.PlanReference) PlanReference {
+	return PlanReference{
+		SpecificationVersion: SpecificationVersion{
+			Major: value.SpecificationVersion.Major,
+			Minor: value.SpecificationVersion.Minor,
+		},
+		WorkflowID:  value.WorkflowID,
+		Fingerprint: value.Fingerprint,
+	}
+}
+
+func snapshotToABI(value ExecutionSnapshot) (abi.ExecutionSnapshot, error) {
+	var state abi.ExecutionState
+	switch current := value.State.(type) {
+	case AwaitingNode:
+		state = abi.ExecutionStateAwaitingNode{Value: abi.AwaitingNode{NodeID: current.NodeID, EffectID: current.EffectID, Input: payloadToABI(current.Input)}}
+	case Completed:
+		state = abi.ExecutionStateCompleted{Value: payloadToABI(current.Output)}
+	default:
+		return abi.ExecutionSnapshot{}, fmt.Errorf("unsupported execution state %T", value.State)
+	}
+	return abi.ExecutionSnapshot{
+		ExecutionID:   value.ExecutionID,
+		PlanReference: planReferenceToABI(value.PlanReference),
+		Revision:      value.Revision,
+		State:         state,
 	}, nil
 }
 
-func decodeEffect(value wacogo.Val) (ExecuteNodeEffect, error) {
-	record, ok := value.(*wacogo.ValRecord)
-	if !ok {
-		return ExecuteNodeEffect{}, unexpectedValue("execute-node effect", value)
+func snapshotFromABI(value abi.ExecutionSnapshot) (ExecutionSnapshot, error) {
+	var state ExecutionState
+	switch current := value.State.(type) {
+	case abi.ExecutionStateAwaitingNode:
+		state = AwaitingNode{NodeID: current.Value.NodeID, EffectID: current.Value.EffectID, Input: payloadFromABI(current.Value.Input)}
+	case abi.ExecutionStateCompleted:
+		state = Completed{Output: payloadFromABI(current.Value)}
+	default:
+		return ExecutionSnapshot{}, fmt.Errorf("component returned unknown execution-state discriminant %T", value.State)
 	}
-	nodeID, err := stringField(record, "node-id")
-	if err != nil {
-		return ExecuteNodeEffect{}, err
-	}
-	input, err := stringField(record, "input")
-	if err != nil {
-		return ExecuteNodeEffect{}, err
-	}
-	return ExecuteNodeEffect{NodeID: nodeID, Input: input}, nil
+	return ExecutionSnapshot{
+		ExecutionID:   value.ExecutionID,
+		PlanReference: planReferenceFromABI(value.PlanReference),
+		Revision:      value.Revision,
+		State:         state,
+	}, nil
 }
 
-func decodeEngineError(value wacogo.Val) error {
-	record, ok := value.(*wacogo.ValRecord)
-	if !ok {
-		return unexpectedValue("engine error", value)
+func eventToABI(value ExecutionEvent) (abi.ExecutionEvent, error) {
+	switch event := value.(type) {
+	case ExecutionStarted:
+		return abi.ExecutionEventExecutionStarted{Value: abi.ExecutionStartedEvent{
+			EventID:       event.EventID,
+			ExecutionID:   event.ExecutionID,
+			PlanReference: planReferenceToABI(event.PlanReference),
+			Input:         payloadToABI(event.Input),
+		}}, nil
+	case NodeCompleted:
+		return abi.ExecutionEventNodeCompleted{Value: abi.NodeCompletedEvent{EventID: event.EventID, ExecutionID: event.ExecutionID, ExpectedRevision: event.ExpectedRevision, EffectID: event.EffectID, NodeID: event.NodeID, Output: payloadToABI(event.Output)}}, nil
+	default:
+		return nil, fmt.Errorf("unsupported execution event %T", value)
 	}
-	code, err := stringField(record, "code")
-	if err != nil {
-		return err
-	}
-	message, err := stringField(record, "message")
-	if err != nil {
-		return err
-	}
-	return &EngineError{Code: code, Message: message}
 }
 
-func stringField(record *wacogo.ValRecord, name string) (string, error) {
-	value, ok := record.Field(name).(wacogo.ValString)
-	if !ok {
-		return "", unexpectedValue(name, record.Field(name))
+func transitionFromABI(value abi.TransitionResult) (Transition, error) {
+	snapshot, err := snapshotFromABI(value.Snapshot)
+	if err != nil {
+		return Transition{}, fmt.Errorf("decode transition snapshot: %w", err)
 	}
-	return string(value), nil
-}
-
-func unexpectedValue(name string, value wacogo.Val) error {
-	return fmt.Errorf("flower component returned invalid %s value %T", name, value)
+	effects := make([]ExecutionEffect, len(value.Effects))
+	for index, effect := range value.Effects {
+		switch current := effect.(type) {
+		case abi.ExecutionEffectExecuteNode:
+			effects[index] = ExecuteNode{EffectID: current.Value.EffectID, ExecutionID: current.Value.ExecutionID, NodeID: current.Value.NodeID, Input: payloadFromABI(current.Value.Input)}
+		default:
+			return Transition{}, fmt.Errorf("component returned unknown execution-effect discriminant at %d: %T", index, effect)
+		}
+	}
+	return Transition{Snapshot: snapshot, Effects: effects}, nil
 }

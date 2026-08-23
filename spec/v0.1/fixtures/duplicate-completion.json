@@ -1,0 +1,129 @@
+{
+  "schema_version": "flower.conformance/v0.1",
+  "name": "duplicate-completion",
+  "definition": {
+    "id": "linear",
+    "nodes": [
+      {
+        "id": "start",
+        "kind": "start"
+      },
+      {
+        "id": "node1",
+        "kind": "activity"
+      },
+      {
+        "id": "node2",
+        "kind": "activity"
+      },
+      {
+        "id": "finish",
+        "kind": "finish"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "start",
+        "target": "node1"
+      },
+      {
+        "id": "e2",
+        "source": "node1",
+        "target": "node2"
+      },
+      {
+        "id": "e3",
+        "source": "node2",
+        "target": "finish"
+      }
+    ]
+  },
+  "expected_compile": {
+    "outcome": "plan",
+    "plan": {
+      "specification_version": {
+        "major": 0,
+        "minor": 1
+      },
+      "workflow_id": "linear",
+      "fingerprint": "a0e93075b7cfb8d0ff24a9ccabb50198b1fa3a64d6b41c6b42c379b958f21017",
+      "nodes": [
+        {
+          "id": "start",
+          "kind": "start"
+        },
+        {
+          "id": "node1",
+          "kind": "activity"
+        },
+        {
+          "id": "node2",
+          "kind": "activity"
+        },
+        {
+          "id": "finish",
+          "kind": "finish"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 1
+          },
+          "workflow_id": "linear",
+          "fingerprint": "a0e93075b7cfb8d0ff24a9ccabb50198b1fa3a64d6b41c6b42c379b958f21017"
+        },
+        "revision": 2,
+        "state": {
+          "type": "awaiting-node",
+          "node_id": "node2",
+          "effect_id": "effect-b1974d164c6c3d5ea0ea544b14a7e70d91f092ae54c70b079c9cc8db84504e82",
+          "input": {
+            "media_type": "text/plain",
+            "bytes": [
+              111,
+              117,
+              116,
+              112,
+              117,
+              116
+            ]
+          }
+        }
+      },
+      "event": {
+        "type": "node-completed",
+        "event_id": "event-1",
+        "execution_id": "execution",
+        "expected_revision": 1,
+        "effect_id": "effect-fe1cd0902d165e9ab7866d864a1e3d474f04c302a02b66a55245b98f21aa41ae",
+        "node_id": "node1",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "stale-revision",
+          "message": "event expects revision ExecutionRevision(1), but snapshot is ExecutionRevision(2)"
+        }
+      }
+    }
+  ]
+}

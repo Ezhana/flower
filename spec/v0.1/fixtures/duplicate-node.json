@@ -1,0 +1,37 @@
+{
+  "schema_version": "flower.conformance/v0.1",
+  "name": "duplicate-node",
+  "definition": {
+    "id": "invalid",
+    "nodes": [
+      {
+        "id": "start",
+        "kind": "start"
+      },
+      {
+        "id": "work",
+        "kind": "activity"
+      },
+      {
+        "id": "work",
+        "kind": "activity"
+      },
+      {
+        "id": "finish",
+        "kind": "finish"
+      }
+    ],
+    "edges": []
+  },
+  "expected_compile": {
+    "outcome": "diagnostics",
+    "diagnostics": [
+      {
+        "code": "duplicate-node",
+        "message": "duplicate node `work`",
+        "subject": "work"
+      }
+    ]
+  },
+  "steps": []
+}

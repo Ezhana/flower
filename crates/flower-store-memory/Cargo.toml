@@ -1,0 +1,13 @@
+[package]
+name = "flower-store-memory"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+flower-host = { path = "../flower-host" }
+flower-kernel = { path = "../flower-kernel" }
+flower-plan = { path = "../flower-plan" }
+
+[dev-dependencies]
+flower-compiler = { path = "../flower-compiler" }

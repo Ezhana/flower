@@ -1,0 +1,10 @@
+[package]
+name = "flower-host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+flower-kernel = { path = "../flower-kernel" }
+flower-plan = { path = "../flower-plan" }
+thiserror.workspace = true

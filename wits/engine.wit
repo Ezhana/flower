@@ -1,70 +1,62 @@
 package flower:engine@0.1.0;
 
 interface workflow-engine {
-    enum node-kind {
-        start,
-        activity,
-        finish,
-    }
+    record specification-version { major: u16, minor: u16 }
+    enum node-kind { start, activity, finish }
+    record node-definition { id: string, kind: node-kind }
+    record edge-definition { id: string, source: string, target: string }
+    record workflow-definition { id: string, nodes: list<node-definition>, edges: list<edge-definition> }
+    record diagnostic { code: string, message: string, subject: option<string> }
 
-    record node-definition {
-        id: string,
-        kind: node-kind,
-    }
-
-    record edge-definition {
-        id: string,
-        source: string,
-        target: string,
-    }
-
-    record workflow-definition {
-        id: string,
-        nodes: list<node-definition>,
-        edges: list<edge-definition>,
-    }
-
-    enum execution-status {
-        running,
-        completed,
-    }
-
-    record execution-snapshot {
+    record plan-node { id: string, kind: node-kind }
+    record executable-workflow-plan {
+        specification-version: specification-version,
         workflow-id: string,
-        status: execution-status,
-        pending-node-id: option<string>,
-        current-value: string,
-        completed-node-ids: list<string>,
+        fingerprint: string,
+        nodes: list<plan-node>,
+    }
+    record plan-reference {
+        specification-version: specification-version,
+        workflow-id: string,
+        fingerprint: string,
     }
 
-    record execute-node-effect {
+    record payload { media-type: string, bytes: list<u8> }
+    record awaiting-node { node-id: string, effect-id: string, input: payload }
+    variant execution-state { awaiting-node(awaiting-node), completed(payload) }
+    record execution-snapshot {
+        execution-id: string,
+        plan-reference: plan-reference,
+        revision: u64,
+        state: execution-state,
+    }
+
+    record execution-started-event {
+        event-id: string,
+        execution-id: string,
+        plan-reference: plan-reference,
+        input: payload,
+    }
+    record node-completed-event {
+        event-id: string,
+        execution-id: string,
+        expected-revision: u64,
+        effect-id: string,
         node-id: string,
-        input: string,
+        output: payload,
     }
+    variant execution-event { execution-started(execution-started-event), node-completed(node-completed-event) }
 
-    record transition {
-        snapshot: execution-snapshot,
-        effects: list<execute-node-effect>,
-    }
+    record execute-node-effect { effect-id: string, execution-id: string, node-id: string, input: payload }
+    variant execution-effect { execute-node(execute-node-effect) }
+    record transition-result { snapshot: execution-snapshot, effects: list<execution-effect> }
+    record engine-error { code: string, message: string }
 
-    record engine-error {
-        code: string,
-        message: string,
-    }
-
-    start: func(
-        workflow: workflow-definition,
-        input: string,
-    ) -> result<transition, engine-error>;
-
-    complete-node: func(
-        workflow: workflow-definition,
-        snapshot: execution-snapshot,
-        node-id: string,
-        output: string,
-    ) -> result<transition, engine-error>;
+    compile: func(definition: workflow-definition) -> result<executable-workflow-plan, list<diagnostic>>;
+    transition: func(plan: executable-workflow-plan, snapshot: option<execution-snapshot>, event: execution-event) -> result<transition-result, engine-error>;
 }
 
-world engine {
-    export workflow-engine;
-}
+world engine { export workflow-engine; }
+
+// Binding-only world used by host SDK generators. The component exports only `engine`.
+world engine-client { import workflow-engine; }

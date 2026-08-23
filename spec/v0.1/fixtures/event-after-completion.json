@@ -1,0 +1,114 @@
+{
+  "schema_version": "flower.conformance/v0.1",
+  "name": "event-after-completion",
+  "definition": {
+    "id": "linear",
+    "nodes": [
+      {
+        "id": "start",
+        "kind": "start"
+      },
+      {
+        "id": "work",
+        "kind": "activity"
+      },
+      {
+        "id": "finish",
+        "kind": "finish"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "start",
+        "target": "work"
+      },
+      {
+        "id": "e2",
+        "source": "work",
+        "target": "finish"
+      }
+    ]
+  },
+  "expected_compile": {
+    "outcome": "plan",
+    "plan": {
+      "specification_version": {
+        "major": 0,
+        "minor": 1
+      },
+      "workflow_id": "linear",
+      "fingerprint": "48c02ca1b8a9c986896e41e957c9b390aebf3a3de047386013e00bf7c5324e4b",
+      "nodes": [
+        {
+          "id": "start",
+          "kind": "start"
+        },
+        {
+          "id": "work",
+          "kind": "activity"
+        },
+        {
+          "id": "finish",
+          "kind": "finish"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "snapshot": {
+        "execution_id": "execution",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 1
+          },
+          "workflow_id": "linear",
+          "fingerprint": "48c02ca1b8a9c986896e41e957c9b390aebf3a3de047386013e00bf7c5324e4b"
+        },
+        "revision": 2,
+        "state": {
+          "type": "completed",
+          "output": {
+            "media_type": "text/plain",
+            "bytes": [
+              111,
+              117,
+              116,
+              112,
+              117,
+              116
+            ]
+          }
+        }
+      },
+      "event": {
+        "type": "node-completed",
+        "event_id": "event-1",
+        "execution_id": "execution",
+        "expected_revision": 1,
+        "effect_id": "effect-9849c3522cdd5549e6b07a455bbecc7593a0466909f50f3546dbb0d43d126979",
+        "node_id": "work",
+        "output": {
+          "media_type": "text/plain",
+          "bytes": [
+            111,
+            117,
+            116,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "execution-already-completed",
+          "message": "completed execution cannot accept events"
+        }
+      }
+    }
+  ]
+}

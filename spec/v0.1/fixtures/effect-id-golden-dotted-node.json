@@ -1,0 +1,134 @@
+{
+  "schema_version": "flower.conformance/v0.1",
+  "name": "effect-id-golden-dotted-node",
+  "definition": {
+    "id": "effect-golden-node",
+    "nodes": [
+      {
+        "id": "start",
+        "kind": "start"
+      },
+      {
+        "id": "node.2.job",
+        "kind": "activity"
+      },
+      {
+        "id": "finish",
+        "kind": "finish"
+      }
+    ],
+    "edges": [
+      {
+        "id": "e1",
+        "source": "start",
+        "target": "node.2.job"
+      },
+      {
+        "id": "e2",
+        "source": "node.2.job",
+        "target": "finish"
+      }
+    ]
+  },
+  "expected_compile": {
+    "outcome": "plan",
+    "plan": {
+      "specification_version": {
+        "major": 0,
+        "minor": 1
+      },
+      "workflow_id": "effect-golden-node",
+      "fingerprint": "644f264b7f223fdfbf8a87f215cd676a3ae0ec26e2293d1b99fdcaf74e773bdb",
+      "nodes": [
+        {
+          "id": "start",
+          "kind": "start"
+        },
+        {
+          "id": "node.2.job",
+          "kind": "activity"
+        },
+        {
+          "id": "finish",
+          "kind": "finish"
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "snapshot": null,
+      "event": {
+        "type": "execution-started",
+        "event_id": "start-event",
+        "execution_id": "tenant",
+        "plan_reference": {
+          "specification_version": {
+            "major": 0,
+            "minor": 1
+          },
+          "workflow_id": "effect-golden-node",
+          "fingerprint": "644f264b7f223fdfbf8a87f215cd676a3ae0ec26e2293d1b99fdcaf74e773bdb"
+        },
+        "input": {
+          "media_type": "text/plain",
+          "bytes": [
+            105,
+            110,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "tenant",
+          "plan_reference": {
+            "specification_version": {
+              "major": 0,
+              "minor": 1
+            },
+            "workflow_id": "effect-golden-node",
+            "fingerprint": "644f264b7f223fdfbf8a87f215cd676a3ae0ec26e2293d1b99fdcaf74e773bdb"
+          },
+          "revision": 1,
+          "state": {
+            "type": "awaiting-node",
+            "node_id": "node.2.job",
+            "effect_id": "effect-06c8f27d9de5825234bbf9754c13a557b394839002c05df3a7f7bb74af956655",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          }
+        },
+        "effects": [
+          {
+            "type": "execute-node",
+            "effect_id": "effect-06c8f27d9de5825234bbf9754c13a557b394839002c05df3a7f7bb74af956655",
+            "execution_id": "tenant",
+            "node_id": "node.2.job",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

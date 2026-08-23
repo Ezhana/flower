@@ -1,126 +1,61 @@
 # Flower
 
-Flower 是一套面向可移植工作流运行时的、语言与平台无关的执行规范，以及该规范的 Rust 参考实现。
+Flower 是语言无关、可持久化、可重放的工作流执行规范及 Rust 参考实现。当前 v0.1 内核只支持一条确定的 `start -> activity* -> finish` 路径；gateway、edge condition、失败、重试、取消与超时尚未进入规范。
 
-项目仍处于早期阶段。当前已完成线性流程的最小纵向切片：Rust 验证并执行 `start -> activity* -> finish`，同一确定性内核可通过 WIT Component 在 Go 中推进。gateway、edge condition、持久化、重试、取消、YAML 解析和 FFI 尚未实现；现有 API 只承诺该最小语义边界。
-
-## 核心定位
-
-Flower 将稳定语义与具体实现技术分开：
-
-- Flower Specification 定义值、节点、执行、错误、能力和状态转换的含义；
-- Rust 是首个参考实现，不是规范本身；
-- WebAssembly Component Model 是隔离并分发跨语言节点的首选格式；
-- WIT 是 Component Model 的绑定，不是 Flower 的语义来源；
-- WASI 是可选的标准能力集合，不会默认授予节点完整系统权限；
-- 原生 API、WIT 执行内核与进程外 API 面向“应用调用运行时”，扩展 Node 使用独立的 WIT world；两类边界不能混成一个 Host API；
-- 规范文档解释语义，一致性测试验证实现。
+## 架构
 
 ```text
-                      Flower Specification
-                    semantic model + rules
-                               │
-                     Rust reference runtime
-                               │
-              ┌────────────────┼────────────────┐
-              │                │                │
-        native binding   component binding  service binding
-            C ABI           WIT / WASM        HTTP / RPC
-              │                │                │
-        host applications  Go hosts / nodes  remote clients
+WorkflowDefinition
+       │
+flower-compiler ── diagnostics + normalize
+       │
+ExecutableWorkflowPlan
+       │
+flower-kernel ── snapshot + event -> snapshot + effects
+       │
+flower-host ── atomic commit + outbox
+       │
+flower-store-memory
 ```
 
-详细边界见 [架构说明](docs/architecture.md) 和 [ADR 索引](docs/adr/README.md)。
+- `flower-plan` 只包含强类型身份、规范版本和不可变执行计划；
+- `flower-compiler` 是定义进入 runtime 的唯一入口；
+- `flower-kernel` 是无 I/O、无随机数、无 async runtime 的纯确定性函数；
+- `flower-host` 协调 snapshot、事件和 Effect intent 的原子提交；
+- `flower-component` 是 WIT 转换层，不保存 execution，也不导入 WASI；
+- Go SDK 公开惯用类型，把生成的 WIT ABI 与 Component runtime 隔离在 `internal/componentabi`。
 
-## 最小领域模型
+完整边界见 [架构说明](docs/architecture.md)，v0.1 行为见 [语义规范](spec/v0.1/semantics.md)。
 
-| 概念 | 含义 |
-| --- | --- |
-| Workflow | 节点、连接关系、输入输出及执行策略的声明 |
-| Node | 一项可调度工作；描述契约，不绑定实现语言 |
-| Execution | 某个节点或工作流的一次有稳定标识的执行 |
-| Attempt | Execution 的一次具体尝试，重试会产生新 Attempt |
-| Event | 推动状态机前进的已记录事实 |
-| Effect | 运行时根据决策执行的外部操作请求 |
-| Capability | 节点显式申请、由 Host 决定是否授予的能力 |
-| Artifact | 计划、代码差异、测试结果、审查意见等可追踪产物 |
-
-完整术语见 [核心概念](docs/concepts.md)。
-
-## 为什么把计算和副作用分开
-
-Flower 的长期执行模型以确定性状态转换为中心：
+## 核心语义
 
 ```text
-current state + event -> transition(new state, effects[])
+None + ExecutionStarted
+  -> AwaitingNode(first activity) + ExecuteNode
+
+AwaitingNode + matching NodeCompleted
+  -> AwaitingNode(next activity) + ExecuteNode
+  -> or Completed + no effects
 ```
 
-网络、数据库、时钟、随机数、文件系统、外部事件和 LLM 调用都属于副作用。节点不应把这些操作伪装成可重放的普通函数；Host 负责记录请求与结果，恢复或重放时复用已记录结果。该决策详见 [ADR-0003](docs/adr/0003-recorded-effect-boundary.md)。
+Payload 是不透明的 `{ media_type, bytes }`。Kernel 不解析 JSON。Execution、Event 和 Effect 都有稳定身份；`ExecutionStarted` 与 snapshot 携带不可变 `PlanReference`。Effect ID 使用规范定义的域分隔、长度前缀 SHA-256 编码确定性推导，Kernel 不生成随机数。
 
-## 仓库结构
+共享 fixture 位于 `spec/v0.1/fixtures`，格式由 `spec/v0.1/fixture-schema.json` 固定。Rust 与 Go Component runner 逐项比较完整 plan、diagnostics、snapshot、effects 和 error。
 
-```text
-crates/
-  flower-ir/        # 已验证、规范化的语言无关 IR
-  flower-compiler/  # 输入模型到 IR 的编译边界
-  flower-runtime/   # Event/Effect 状态机与原生 runner
-  flower-component/ # 确定性执行内核的 WIT Component adapter
-  flower-cli/       # 尚未实现的命令行入口
-docs/               # 架构、规范、路线图与 ADR
-examples/           # 流程定义示例
-ffi/                # 预留的原生 C ABI
-sdk/                # Go SDK 与后续语言 binding
-wits/               # 版本化 WIT contract
-```
+## 验证
 
-`flower-ir` 与 `flower-runtime` 已实现线性切片，Compiler、CLI 及其余运行时能力仍在演进。以 [路线图](docs/roadmap.md) 的验收条件为准。
-
-## 构建 Component 与运行 Go 测试
-
-需要安装 Rust 的 `wasm32-unknown-unknown` target、`wasm-tools` 与 Go 1.25.5+：
+安装 Rust stable、`wasm32-unknown-unknown` target 与 Go 1.25.5+，然后运行：
 
 ```bash
-rustup target add wasm32-unknown-unknown
-cargo install wasm-tools --version 1.240.0 --locked
-scripts/build-component.sh
-cd sdk/go && go test ./...
+scripts/verify.sh
 ```
 
-Component 刻意不导入 WASI。Go SDK 负责执行 Runtime 返回的 Effect，并把完成事件连同 snapshot 送回 Rust 内核。
-
-## 代码风格与质量检查
-
-仓库使用 Rust 2024 edition，并通过根目录的 [`rustfmt.toml`](rustfmt.toml) 统一格式。安装包含 `rustfmt` 和 `clippy` 的稳定 Rust 工具链后依次运行：
-
-```bash
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features
-```
-
-`rustfmt` 负责确定性的代码排版；Clippy 负责可疑写法和惯用法检查；测试负责行为验证。格式问题使用 `cargo fmt --all` 自动修复，Clippy 告警必须通过代码修改或有明确依据的局部 `#[allow(...)]` 解决，不能在 workspace 级别静默关闭。
-
-当前检查覆盖线性流程的结构验证、Rust 原生执行、WIT Component 构建与 Go 端到端调用；它不能证明尚未实现的 gateway、持久化、重试或取消语义。
-
-示例流程位于 [`examples/hello.flower.yaml`](examples/hello.flower.yaml)。它目前用于讨论输入格式，不代表已经冻结的 schema。
+脚本执行格式、Clippy、Rust tests、Component 构建/验证、无 WASI import 检查和 Go conformance tests。Component 构建使用仓库内的 `flower-component-tools`，不依赖全局安装 `wasm-tools`。
 
 ## 文档
 
-- [架构说明](docs/architecture.md)：系统边界、依赖方向与目标运行模型；
-- [核心概念](docs/concepts.md)：跨语言公共词汇和状态语义；
-- [规范组织](docs/specification.md)：机器模型、规范文本和一致性测试如何共同构成规范；
-- [路线图](docs/roadmap.md)：按可验证结果推进的实现顺序；
-- [ADR](docs/adr/README.md)：已接受和拟议中的重要架构决策。
-
-## 设计纪律
-
-只有必须在独立实现间保持一致的概念，才能进入 Flower Specification。语言习惯、运行时优化、SDK 便利 API 和供应商集成都应留在实现或适配层。
-
-新增设计前应回答：
-
-1. 这是跨实现语义，还是某个实现的工程选择？
-2. 能否由一致性测试观察并验证？
-3. 是否把 Flower 推向了另一门通用编程语言？
-4. 如果 Rust 或 WASM 被替换，这个概念是否仍然成立？
-
-相关决策发生变化时，先新增或替代 ADR，不要静默改写历史决定。
+- [架构说明](docs/architecture.md)
+- [核心概念](docs/concepts.md)
+- [规范组织](docs/specification.md)
+- [路线图](docs/roadmap.md)
+- [ADR](docs/adr/README.md)

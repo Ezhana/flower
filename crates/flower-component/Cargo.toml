@@ -7,6 +7,7 @@ edition = "2024"
 crate-type = ["cdylib"]
 
 [dependencies]
-flower-ir = { path = "../flower-ir" }
-flower-runtime = { path = "../flower-runtime" }
+flower-plan = { path = "../flower-plan" }
+flower-compiler = { path = "../flower-compiler" }
+flower-kernel = { path = "../flower-kernel" }
 wit-bindgen.workspace = true

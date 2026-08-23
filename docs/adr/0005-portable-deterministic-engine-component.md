@@ -23,7 +23,7 @@ validated workflow + execution snapshot + recorded event
 
 Flower 采用双目标执行内核：
 
-1. `flower-runtime` 保持平台无关、无 I/O，原生 Rust Host 可直接链接；
+1. `flower-kernel` 保持平台无关、无 I/O，原生 Rust Host 可直接链接；
 2. `flower-component` 将同一执行内核编译成无 WASI import 的 WebAssembly Component；
 3. `flower:engine/workflow-engine@0.1.0` 只暴露确定性状态转换，不在 Component 内持有 durable state；
 4. Go Host 负责保存 `execution-snapshot`、执行 `execute-node-effect`，再把完成事实送回内核；
