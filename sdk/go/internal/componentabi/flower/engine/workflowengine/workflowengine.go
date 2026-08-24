@@ -9,7 +9,7 @@ import (
 
 // InterfaceName is the canonical WIT id of the interface this binding
 // was generated from.
-const InterfaceName = "flower:engine/workflow-engine@0.2.0"
+const InterfaceName = "flower:engine/workflow-engine@0.1.0"
 
 // WorkflowEngine is the Go binding for the flower:engine/workflow-engine interface.
 // Implement it to provide a host-side component, or pass an exported wasm
@@ -114,12 +114,6 @@ type ResultTransitionResultEngineErrorErr struct{ Value EngineError }
 func (ResultTransitionResultEngineErrorOk) isResultTransitionResultEngineError()  {}
 func (ResultTransitionResultEngineErrorErr) isResultTransitionResultEngineError() {}
 
-// SpecificationVersion corresponds to the WIT record specification-version.
-type SpecificationVersion struct {
-	Major uint16
-	Minor uint16
-}
-
 // FixedBackoff corresponds to the WIT record fixed-backoff.
 type FixedBackoff struct {
 	DelayMs uint64
@@ -176,17 +170,15 @@ type PlanNode struct {
 
 // ExecutableWorkflowPlan corresponds to the WIT record executable-workflow-plan.
 type ExecutableWorkflowPlan struct {
-	SpecificationVersion SpecificationVersion
-	WorkflowID           string
-	Fingerprint          string
-	Nodes                []PlanNode
+	WorkflowID  string
+	Fingerprint string
+	Nodes       []PlanNode
 }
 
 // PlanReference corresponds to the WIT record plan-reference.
 type PlanReference struct {
-	SpecificationVersion SpecificationVersion
-	WorkflowID           string
-	Fingerprint          string
+	WorkflowID  string
+	Fingerprint string
 }
 
 // Payload corresponds to the WIT record payload.
@@ -256,7 +248,6 @@ type ExecutionSnapshot struct {
 
 // ExecutionStartedEvent corresponds to the WIT record execution-started-event.
 type ExecutionStartedEvent struct {
-	EventID       string
 	ExecutionID   string
 	PlanReference PlanReference
 	Input         Payload
@@ -264,7 +255,6 @@ type ExecutionStartedEvent struct {
 
 // NodeAttemptSucceededEvent corresponds to the WIT record node-attempt-succeeded-event.
 type NodeAttemptSucceededEvent struct {
-	EventID          string
 	ExecutionID      string
 	ExpectedRevision uint64
 	ActivationID     string
@@ -277,7 +267,6 @@ type NodeAttemptSucceededEvent struct {
 
 // NodeAttemptFailedEvent corresponds to the WIT record node-attempt-failed-event.
 type NodeAttemptFailedEvent struct {
-	EventID          string
 	ExecutionID      string
 	ExpectedRevision uint64
 	ActivationID     string
@@ -290,7 +279,6 @@ type NodeAttemptFailedEvent struct {
 
 // TimerFiredEvent corresponds to the WIT record timer-fired-event.
 type TimerFiredEvent struct {
-	EventID           string
 	ExecutionID       string
 	ExpectedRevision  uint64
 	TimerID           string

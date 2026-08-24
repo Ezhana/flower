@@ -35,8 +35,6 @@ func NewFactory(ctx context.Context, e *wacogo.Engine) (*Factory, error) {
 
 	typNodeKind_ := b_.AddType("node-kind", host.Enum{Cases: []string{"start", "activity", "finish"}})
 	_ = typNodeKind_
-	typSpecificationVersion_ := b_.AddType("specification-version", host.Record{Fields: []host.Field{{Name: "major", Type: host.U16}, {Name: "minor", Type: host.U16}}})
-	_ = typSpecificationVersion_
 	typFixedBackoff_ := b_.AddType("fixed-backoff", host.Record{Fields: []host.Field{{Name: "delay-ms", Type: host.U64}}})
 	_ = typFixedBackoff_
 	typExponentialBackoff_ := b_.AddType("exponential-backoff", host.Record{Fields: []host.Field{{Name: "initial-delay-ms", Type: host.U64}, {Name: "multiplier", Type: host.U32}, {Name: "maximum-delay-ms", Type: host.U64}}})
@@ -55,9 +53,9 @@ func NewFactory(ctx context.Context, e *wacogo.Engine) (*Factory, error) {
 	_ = typDiagnostic_
 	typPlanNode_ := b_.AddType("plan-node", host.Record{Fields: []host.Field{{Name: "id", Type: host.String}, {Name: "kind", Type: typNodeKind_}, {Name: "retry-policy", Type: host.Option{Inner: typRetryPolicy_}}}})
 	_ = typPlanNode_
-	typExecutableWorkflowPlan_ := b_.AddType("executable-workflow-plan", host.Record{Fields: []host.Field{{Name: "specification-version", Type: typSpecificationVersion_}, {Name: "workflow-id", Type: host.String}, {Name: "fingerprint", Type: host.String}, {Name: "nodes", Type: host.List{Elem: typPlanNode_}}}})
+	typExecutableWorkflowPlan_ := b_.AddType("executable-workflow-plan", host.Record{Fields: []host.Field{{Name: "workflow-id", Type: host.String}, {Name: "fingerprint", Type: host.String}, {Name: "nodes", Type: host.List{Elem: typPlanNode_}}}})
 	_ = typExecutableWorkflowPlan_
-	typPlanReference_ := b_.AddType("plan-reference", host.Record{Fields: []host.Field{{Name: "specification-version", Type: typSpecificationVersion_}, {Name: "workflow-id", Type: host.String}, {Name: "fingerprint", Type: host.String}}})
+	typPlanReference_ := b_.AddType("plan-reference", host.Record{Fields: []host.Field{{Name: "workflow-id", Type: host.String}, {Name: "fingerprint", Type: host.String}}})
 	_ = typPlanReference_
 	typPayload_ := b_.AddType("payload", host.Record{Fields: []host.Field{{Name: "media-type", Type: host.String}, {Name: "bytes", Type: host.List{Elem: host.U8}}}})
 	_ = typPayload_
@@ -79,13 +77,13 @@ func NewFactory(ctx context.Context, e *wacogo.Engine) (*Factory, error) {
 	_ = typExecutionState_
 	typExecutionSnapshot_ := b_.AddType("execution-snapshot", host.Record{Fields: []host.Field{{Name: "execution-id", Type: host.String}, {Name: "plan-reference", Type: typPlanReference_}, {Name: "revision", Type: host.U64}, {Name: "state", Type: typExecutionState_}}})
 	_ = typExecutionSnapshot_
-	typExecutionStartedEvent_ := b_.AddType("execution-started-event", host.Record{Fields: []host.Field{{Name: "event-id", Type: host.String}, {Name: "execution-id", Type: host.String}, {Name: "plan-reference", Type: typPlanReference_}, {Name: "input", Type: typPayload_}}})
+	typExecutionStartedEvent_ := b_.AddType("execution-started-event", host.Record{Fields: []host.Field{{Name: "execution-id", Type: host.String}, {Name: "plan-reference", Type: typPlanReference_}, {Name: "input", Type: typPayload_}}})
 	_ = typExecutionStartedEvent_
-	typNodeAttemptSucceededEvent_ := b_.AddType("node-attempt-succeeded-event", host.Record{Fields: []host.Field{{Name: "event-id", Type: host.String}, {Name: "execution-id", Type: host.String}, {Name: "expected-revision", Type: host.U64}, {Name: "activation-id", Type: host.String}, {Name: "attempt-id", Type: host.String}, {Name: "attempt-number", Type: host.U32}, {Name: "effect-id", Type: host.String}, {Name: "node-id", Type: host.String}, {Name: "output", Type: typPayload_}}})
+	typNodeAttemptSucceededEvent_ := b_.AddType("node-attempt-succeeded-event", host.Record{Fields: []host.Field{{Name: "execution-id", Type: host.String}, {Name: "expected-revision", Type: host.U64}, {Name: "activation-id", Type: host.String}, {Name: "attempt-id", Type: host.String}, {Name: "attempt-number", Type: host.U32}, {Name: "effect-id", Type: host.String}, {Name: "node-id", Type: host.String}, {Name: "output", Type: typPayload_}}})
 	_ = typNodeAttemptSucceededEvent_
-	typNodeAttemptFailedEvent_ := b_.AddType("node-attempt-failed-event", host.Record{Fields: []host.Field{{Name: "event-id", Type: host.String}, {Name: "execution-id", Type: host.String}, {Name: "expected-revision", Type: host.U64}, {Name: "activation-id", Type: host.String}, {Name: "attempt-id", Type: host.String}, {Name: "attempt-number", Type: host.U32}, {Name: "effect-id", Type: host.String}, {Name: "node-id", Type: host.String}, {Name: "failure", Type: typAttemptFailure_}}})
+	typNodeAttemptFailedEvent_ := b_.AddType("node-attempt-failed-event", host.Record{Fields: []host.Field{{Name: "execution-id", Type: host.String}, {Name: "expected-revision", Type: host.U64}, {Name: "activation-id", Type: host.String}, {Name: "attempt-id", Type: host.String}, {Name: "attempt-number", Type: host.U32}, {Name: "effect-id", Type: host.String}, {Name: "node-id", Type: host.String}, {Name: "failure", Type: typAttemptFailure_}}})
 	_ = typNodeAttemptFailedEvent_
-	typTimerFiredEvent_ := b_.AddType("timer-fired-event", host.Record{Fields: []host.Field{{Name: "event-id", Type: host.String}, {Name: "execution-id", Type: host.String}, {Name: "expected-revision", Type: host.U64}, {Name: "timer-id", Type: host.String}, {Name: "activation-id", Type: host.String}, {Name: "next-attempt-number", Type: host.U32}}})
+	typTimerFiredEvent_ := b_.AddType("timer-fired-event", host.Record{Fields: []host.Field{{Name: "execution-id", Type: host.String}, {Name: "expected-revision", Type: host.U64}, {Name: "timer-id", Type: host.String}, {Name: "activation-id", Type: host.String}, {Name: "next-attempt-number", Type: host.U32}}})
 	_ = typTimerFiredEvent_
 	typExecuteNodeAttemptEffect_ := b_.AddType("execute-node-attempt-effect", host.Record{Fields: []host.Field{{Name: "effect-id", Type: host.String}, {Name: "activation-id", Type: host.String}, {Name: "attempt-id", Type: host.String}, {Name: "attempt-number", Type: host.U32}, {Name: "node-id", Type: host.String}, {Name: "input", Type: typPayload_}}})
 	_ = typExecuteNodeAttemptEffect_
@@ -993,22 +991,17 @@ func toGoFlatExecutableWorkflowPlan(ctx context.Context, cc *host.CallContext, h
 	var v_ ExecutableWorkflowPlan
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if tmp_, err_ := toGoFlatSpecificationVersion(ctx, cc, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
-		return ExecutableWorkflowPlan{}, err_
-	} else {
-		v_.SpecificationVersion = tmp_
-	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.WorkflowID = tmp_
 	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[2].Type, stack[4:6]); err_ != nil {
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.Fingerprint = tmp_
 	}
-	if tmp_, err_ := toGoFlatListPlanNode(ctx, cc, h, recT_.Fields[3].Type, stack[6:8]); err_ != nil {
+	if tmp_, err_ := toGoFlatListPlanNode(ctx, cc, h, recT_.Fields[2].Type, stack[4:6]); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.Nodes = tmp_
@@ -1020,22 +1013,17 @@ func toGoMemExecutableWorkflowPlan(ctx context.Context, cc *host.CallContext, h 
 	var v_ ExecutableWorkflowPlan
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if tmp_, err_ := toGoMemSpecificationVersion(ctx, cc, h, recT_.Fields[0].Type, ptr); err_ != nil {
-		return ExecutableWorkflowPlan{}, err_
-	} else {
-		v_.SpecificationVersion = tmp_
-	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[1].Type, ptr+4); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.WorkflowID = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[2].Type, ptr+12); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.Fingerprint = tmp_
 	}
-	if tmp_, err_ := toGoMemListPlanNode(ctx, cc, h, recT_.Fields[3].Type, ptr+20); err_ != nil {
+	if tmp_, err_ := toGoMemListPlanNode(ctx, cc, h, recT_.Fields[2].Type, ptr+16); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.Nodes = tmp_
@@ -1044,32 +1032,26 @@ func toGoMemExecutableWorkflowPlan(ctx context.Context, cc *host.CallContext, h 
 }
 
 func fromGoFlatExecutableWorkflowPlan(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, stack []uint64, v ExecutableWorkflowPlan) error {
-	if err_ := fromGoFlatSpecificationVersion(ctx, cc, h, stack[0:2], v.SpecificationVersion); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.WorkflowID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[2:4], v.WorkflowID); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[2:4], v.Fingerprint); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[4:6], v.Fingerprint); err_ != nil {
-		return err_
-	}
-	if err_ := fromGoFlatListPlanNode(ctx, cc, h, stack[6:8], v.Nodes); err_ != nil {
+	if err_ := fromGoFlatListPlanNode(ctx, cc, h, stack[4:6], v.Nodes); err_ != nil {
 		return err_
 	}
 	return nil
 }
 
 func fromGoMemExecutableWorkflowPlan(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, ptr uint32, v ExecutableWorkflowPlan) error {
-	if err_ := fromGoMemSpecificationVersion(ctx, cc, h, ptr, v.SpecificationVersion); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr, v.WorkflowID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+4, v.WorkflowID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+8, v.Fingerprint); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+12, v.Fingerprint); err_ != nil {
-		return err_
-	}
-	if err_ := fromGoMemListPlanNode(ctx, cc, h, ptr+20, v.Nodes); err_ != nil {
+	if err_ := fromGoMemListPlanNode(ctx, cc, h, ptr+16, v.Nodes); err_ != nil {
 		return err_
 	}
 	return nil
@@ -1079,22 +1061,17 @@ func liftFlatExecutableWorkflowPlan(ctx context.Context, caller, callee *host.Ca
 	var v_ ExecutableWorkflowPlan
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if tmp_, err_ := liftFlatSpecificationVersion(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
-		return ExecutableWorkflowPlan{}, err_
-	} else {
-		v_.SpecificationVersion = tmp_
-	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.WorkflowID = tmp_
 	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[2].Type, stack[4:6]); err_ != nil {
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.Fingerprint = tmp_
 	}
-	if tmp_, err_ := liftFlatListPlanNode(ctx, caller, callee, h, recT_.Fields[3].Type, stack[6:8]); err_ != nil {
+	if tmp_, err_ := liftFlatListPlanNode(ctx, caller, callee, h, recT_.Fields[2].Type, stack[4:6]); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.Nodes = tmp_
@@ -1106,22 +1083,17 @@ func liftMemExecutableWorkflowPlan(ctx context.Context, caller, callee *host.Cal
 	var v_ ExecutableWorkflowPlan
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if tmp_, err_ := liftMemSpecificationVersion(ctx, caller, callee, h, recT_.Fields[0].Type, ptr); err_ != nil {
-		return ExecutableWorkflowPlan{}, err_
-	} else {
-		v_.SpecificationVersion = tmp_
-	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+4); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.WorkflowID = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+12); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.Fingerprint = tmp_
 	}
-	if tmp_, err_ := liftMemListPlanNode(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+20); err_ != nil {
+	if tmp_, err_ := liftMemListPlanNode(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+16); err_ != nil {
 		return ExecutableWorkflowPlan{}, err_
 	} else {
 		v_.Nodes = tmp_
@@ -1132,16 +1104,13 @@ func liftMemExecutableWorkflowPlan(ctx context.Context, caller, callee *host.Cal
 func lowerFlatExecutableWorkflowPlan(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64, v ExecutableWorkflowPlan) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerFlatSpecificationVersion(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.SpecificationVersion); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.WorkflowID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4], v.WorkflowID); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4], v.Fingerprint); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[2].Type, stack[4:6], v.Fingerprint); err_ != nil {
-		return err_
-	}
-	if err_ := lowerFlatListPlanNode(ctx, caller, callee, h, recT_.Fields[3].Type, stack[6:8], v.Nodes); err_ != nil {
+	if err_ := lowerFlatListPlanNode(ctx, caller, callee, h, recT_.Fields[2].Type, stack[4:6], v.Nodes); err_ != nil {
 		return err_
 	}
 	return nil
@@ -1150,16 +1119,13 @@ func lowerFlatExecutableWorkflowPlan(ctx context.Context, caller, callee *host.C
 func lowerMemExecutableWorkflowPlan(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, ptr uint32, v ExecutableWorkflowPlan) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerMemSpecificationVersion(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.SpecificationVersion); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.WorkflowID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+4, v.WorkflowID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8, v.Fingerprint); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+12, v.Fingerprint); err_ != nil {
-		return err_
-	}
-	if err_ := lowerMemListPlanNode(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+20, v.Nodes); err_ != nil {
+	if err_ := lowerMemListPlanNode(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+16, v.Nodes); err_ != nil {
 		return err_
 	}
 	return nil
@@ -1600,7 +1566,7 @@ func toGoFlatExecutionEvent(ctx context.Context, cc *host.CallContext, h *host.C
 	switch disc_ {
 	case 0:
 		var val ExecutionStartedEvent
-		if tmp_, err_ := toGoFlatExecutionStartedEvent(ctx, cc, h, varT_.Cases[0].Payload, stack[1:15]); err_ != nil {
+		if tmp_, err_ := toGoFlatExecutionStartedEvent(ctx, cc, h, varT_.Cases[0].Payload, stack[1:11]); err_ != nil {
 			return nil, err_
 		} else {
 			val = tmp_
@@ -1608,7 +1574,7 @@ func toGoFlatExecutionEvent(ctx context.Context, cc *host.CallContext, h *host.C
 		return ExecutionEventExecutionStarted{Value: val}, nil
 	case 1:
 		var val NodeAttemptSucceededEvent
-		if tmp_, err_ := toGoFlatNodeAttemptSucceededEvent(ctx, cc, h, varT_.Cases[1].Payload, stack[1:19]); err_ != nil {
+		if tmp_, err_ := toGoFlatNodeAttemptSucceededEvent(ctx, cc, h, varT_.Cases[1].Payload, stack[1:17]); err_ != nil {
 			return nil, err_
 		} else {
 			val = tmp_
@@ -1616,7 +1582,7 @@ func toGoFlatExecutionEvent(ctx context.Context, cc *host.CallContext, h *host.C
 		return ExecutionEventNodeAttemptSucceeded{Value: val}, nil
 	case 2:
 		var val NodeAttemptFailedEvent
-		if tmp_, err_ := toGoFlatNodeAttemptFailedEvent(ctx, cc, h, varT_.Cases[2].Payload, stack[1:22]); err_ != nil {
+		if tmp_, err_ := toGoFlatNodeAttemptFailedEvent(ctx, cc, h, varT_.Cases[2].Payload, stack[1:20]); err_ != nil {
 			return nil, err_
 		} else {
 			val = tmp_
@@ -1624,7 +1590,7 @@ func toGoFlatExecutionEvent(ctx context.Context, cc *host.CallContext, h *host.C
 		return ExecutionEventNodeAttemptFailed{Value: val}, nil
 	case 3:
 		var val TimerFiredEvent
-		if tmp_, err_ := toGoFlatTimerFiredEvent(ctx, cc, h, varT_.Cases[3].Payload, stack[1:11]); err_ != nil {
+		if tmp_, err_ := toGoFlatTimerFiredEvent(ctx, cc, h, varT_.Cases[3].Payload, stack[1:9]); err_ != nil {
 			return nil, err_
 		} else {
 			val = tmp_
@@ -1684,32 +1650,7 @@ func fromGoFlatExecutionEvent(ctx context.Context, cc *host.CallContext, h *host
 	switch x := v.(type) {
 	case ExecutionEventExecutionStarted:
 		stack[0] = 0
-		if err_ := fromGoFlatExecutionStartedEvent(ctx, cc, h, stack[1:15], x.Value); err_ != nil {
-			return err_
-		}
-		stack[15] = 0
-		stack[16] = 0
-		stack[17] = 0
-		stack[18] = 0
-		stack[19] = 0
-		stack[20] = 0
-		stack[21] = 0
-	case ExecutionEventNodeAttemptSucceeded:
-		stack[0] = 1
-		if err_ := fromGoFlatNodeAttemptSucceededEvent(ctx, cc, h, stack[1:19], x.Value); err_ != nil {
-			return err_
-		}
-		stack[19] = 0
-		stack[20] = 0
-		stack[21] = 0
-	case ExecutionEventNodeAttemptFailed:
-		stack[0] = 2
-		if err_ := fromGoFlatNodeAttemptFailedEvent(ctx, cc, h, stack[1:22], x.Value); err_ != nil {
-			return err_
-		}
-	case ExecutionEventTimerFired:
-		stack[0] = 3
-		if err_ := fromGoFlatTimerFiredEvent(ctx, cc, h, stack[1:11], x.Value); err_ != nil {
+		if err_ := fromGoFlatExecutionStartedEvent(ctx, cc, h, stack[1:11], x.Value); err_ != nil {
 			return err_
 		}
 		stack[11] = 0
@@ -1721,8 +1662,35 @@ func fromGoFlatExecutionEvent(ctx context.Context, cc *host.CallContext, h *host
 		stack[17] = 0
 		stack[18] = 0
 		stack[19] = 0
-		stack[20] = 0
-		stack[21] = 0
+	case ExecutionEventNodeAttemptSucceeded:
+		stack[0] = 1
+		if err_ := fromGoFlatNodeAttemptSucceededEvent(ctx, cc, h, stack[1:17], x.Value); err_ != nil {
+			return err_
+		}
+		stack[17] = 0
+		stack[18] = 0
+		stack[19] = 0
+	case ExecutionEventNodeAttemptFailed:
+		stack[0] = 2
+		if err_ := fromGoFlatNodeAttemptFailedEvent(ctx, cc, h, stack[1:20], x.Value); err_ != nil {
+			return err_
+		}
+	case ExecutionEventTimerFired:
+		stack[0] = 3
+		if err_ := fromGoFlatTimerFiredEvent(ctx, cc, h, stack[1:9], x.Value); err_ != nil {
+			return err_
+		}
+		stack[9] = 0
+		stack[10] = 0
+		stack[11] = 0
+		stack[12] = 0
+		stack[13] = 0
+		stack[14] = 0
+		stack[15] = 0
+		stack[16] = 0
+		stack[17] = 0
+		stack[18] = 0
+		stack[19] = 0
 	default:
 		return fmt.Errorf("wacogo/witgen: fromGoFlatExecutionEvent: unknown variant case")
 	}
@@ -1772,7 +1740,7 @@ func liftFlatExecutionEvent(ctx context.Context, caller, callee *host.CallContex
 	switch disc_ {
 	case 0:
 		var val ExecutionStartedEvent
-		if tmp_, err_ := liftFlatExecutionStartedEvent(ctx, caller, callee, h, varT_.Cases[0].Payload, stack[1:15]); err_ != nil {
+		if tmp_, err_ := liftFlatExecutionStartedEvent(ctx, caller, callee, h, varT_.Cases[0].Payload, stack[1:11]); err_ != nil {
 			return nil, err_
 		} else {
 			val = tmp_
@@ -1780,7 +1748,7 @@ func liftFlatExecutionEvent(ctx context.Context, caller, callee *host.CallContex
 		return ExecutionEventExecutionStarted{Value: val}, nil
 	case 1:
 		var val NodeAttemptSucceededEvent
-		if tmp_, err_ := liftFlatNodeAttemptSucceededEvent(ctx, caller, callee, h, varT_.Cases[1].Payload, stack[1:19]); err_ != nil {
+		if tmp_, err_ := liftFlatNodeAttemptSucceededEvent(ctx, caller, callee, h, varT_.Cases[1].Payload, stack[1:17]); err_ != nil {
 			return nil, err_
 		} else {
 			val = tmp_
@@ -1788,7 +1756,7 @@ func liftFlatExecutionEvent(ctx context.Context, caller, callee *host.CallContex
 		return ExecutionEventNodeAttemptSucceeded{Value: val}, nil
 	case 2:
 		var val NodeAttemptFailedEvent
-		if tmp_, err_ := liftFlatNodeAttemptFailedEvent(ctx, caller, callee, h, varT_.Cases[2].Payload, stack[1:22]); err_ != nil {
+		if tmp_, err_ := liftFlatNodeAttemptFailedEvent(ctx, caller, callee, h, varT_.Cases[2].Payload, stack[1:20]); err_ != nil {
 			return nil, err_
 		} else {
 			val = tmp_
@@ -1796,7 +1764,7 @@ func liftFlatExecutionEvent(ctx context.Context, caller, callee *host.CallContex
 		return ExecutionEventNodeAttemptFailed{Value: val}, nil
 	case 3:
 		var val TimerFiredEvent
-		if tmp_, err_ := liftFlatTimerFiredEvent(ctx, caller, callee, h, varT_.Cases[3].Payload, stack[1:11]); err_ != nil {
+		if tmp_, err_ := liftFlatTimerFiredEvent(ctx, caller, callee, h, varT_.Cases[3].Payload, stack[1:9]); err_ != nil {
 			return nil, err_
 		} else {
 			val = tmp_
@@ -1858,32 +1826,7 @@ func lowerFlatExecutionEvent(ctx context.Context, caller, callee *host.CallConte
 	switch x := v.(type) {
 	case ExecutionEventExecutionStarted:
 		stack[0] = 0
-		if err_ := lowerFlatExecutionStartedEvent(ctx, caller, callee, h, varT_.Cases[0].Payload, stack[1:15], x.Value); err_ != nil {
-			return err_
-		}
-		stack[15] = 0
-		stack[16] = 0
-		stack[17] = 0
-		stack[18] = 0
-		stack[19] = 0
-		stack[20] = 0
-		stack[21] = 0
-	case ExecutionEventNodeAttemptSucceeded:
-		stack[0] = 1
-		if err_ := lowerFlatNodeAttemptSucceededEvent(ctx, caller, callee, h, varT_.Cases[1].Payload, stack[1:19], x.Value); err_ != nil {
-			return err_
-		}
-		stack[19] = 0
-		stack[20] = 0
-		stack[21] = 0
-	case ExecutionEventNodeAttemptFailed:
-		stack[0] = 2
-		if err_ := lowerFlatNodeAttemptFailedEvent(ctx, caller, callee, h, varT_.Cases[2].Payload, stack[1:22], x.Value); err_ != nil {
-			return err_
-		}
-	case ExecutionEventTimerFired:
-		stack[0] = 3
-		if err_ := lowerFlatTimerFiredEvent(ctx, caller, callee, h, varT_.Cases[3].Payload, stack[1:11], x.Value); err_ != nil {
+		if err_ := lowerFlatExecutionStartedEvent(ctx, caller, callee, h, varT_.Cases[0].Payload, stack[1:11], x.Value); err_ != nil {
 			return err_
 		}
 		stack[11] = 0
@@ -1895,8 +1838,35 @@ func lowerFlatExecutionEvent(ctx context.Context, caller, callee *host.CallConte
 		stack[17] = 0
 		stack[18] = 0
 		stack[19] = 0
-		stack[20] = 0
-		stack[21] = 0
+	case ExecutionEventNodeAttemptSucceeded:
+		stack[0] = 1
+		if err_ := lowerFlatNodeAttemptSucceededEvent(ctx, caller, callee, h, varT_.Cases[1].Payload, stack[1:17], x.Value); err_ != nil {
+			return err_
+		}
+		stack[17] = 0
+		stack[18] = 0
+		stack[19] = 0
+	case ExecutionEventNodeAttemptFailed:
+		stack[0] = 2
+		if err_ := lowerFlatNodeAttemptFailedEvent(ctx, caller, callee, h, varT_.Cases[2].Payload, stack[1:20], x.Value); err_ != nil {
+			return err_
+		}
+	case ExecutionEventTimerFired:
+		stack[0] = 3
+		if err_ := lowerFlatTimerFiredEvent(ctx, caller, callee, h, varT_.Cases[3].Payload, stack[1:9], x.Value); err_ != nil {
+			return err_
+		}
+		stack[9] = 0
+		stack[10] = 0
+		stack[11] = 0
+		stack[12] = 0
+		stack[13] = 0
+		stack[14] = 0
+		stack[15] = 0
+		stack[16] = 0
+		stack[17] = 0
+		stack[18] = 0
+		stack[19] = 0
 	default:
 		return fmt.Errorf("wacogo/witgen: lowerFlatExecutionEvent: unknown variant case")
 	}
@@ -1950,13 +1920,13 @@ func toGoFlatExecutionSnapshot(ctx context.Context, cc *host.CallContext, h *hos
 	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, err_ := toGoFlatPlanReference(ctx, cc, h, recT_.Fields[1].Type, stack[2:8]); err_ != nil {
+	if tmp_, err_ := toGoFlatPlanReference(ctx, cc, h, recT_.Fields[1].Type, stack[2:6]); err_ != nil {
 		return ExecutionSnapshot{}, err_
 	} else {
 		v_.PlanReference = tmp_
 	}
-	v_.Revision = stack[8]
-	if tmp_, err_ := toGoFlatExecutionState(ctx, cc, h, recT_.Fields[3].Type, stack[9:39]); err_ != nil {
+	v_.Revision = stack[6]
+	if tmp_, err_ := toGoFlatExecutionState(ctx, cc, h, recT_.Fields[3].Type, stack[7:37]); err_ != nil {
 		return ExecutionSnapshot{}, err_
 	} else {
 		v_.State = tmp_
@@ -1978,12 +1948,12 @@ func toGoMemExecutionSnapshot(ctx context.Context, cc *host.CallContext, h *host
 	} else {
 		v_.PlanReference = tmp_
 	}
-	if tmp_, ok_ := cc.Memory().ReadUint64Le(ptr + 32); !ok_ {
+	if tmp_, ok_ := cc.Memory().ReadUint64Le(ptr + 24); !ok_ {
 		return ExecutionSnapshot{}, fmt.Errorf("wacogo/witgen: toGoMemExecutionSnapshot: field Revision: bad memory read")
 	} else {
 		v_.Revision = tmp_
 	}
-	if tmp_, err_ := toGoMemExecutionState(ctx, cc, h, recT_.Fields[3].Type, ptr+40); err_ != nil {
+	if tmp_, err_ := toGoMemExecutionState(ctx, cc, h, recT_.Fields[3].Type, ptr+32); err_ != nil {
 		return ExecutionSnapshot{}, err_
 	} else {
 		v_.State = tmp_
@@ -1995,11 +1965,11 @@ func fromGoFlatExecutionSnapshot(ctx context.Context, cc *host.CallContext, h *h
 	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatPlanReference(ctx, cc, h, stack[2:8], v.PlanReference); err_ != nil {
+	if err_ := fromGoFlatPlanReference(ctx, cc, h, stack[2:6], v.PlanReference); err_ != nil {
 		return err_
 	}
-	stack[8] = v.Revision
-	if err_ := fromGoFlatExecutionState(ctx, cc, h, stack[9:39], v.State); err_ != nil {
+	stack[6] = v.Revision
+	if err_ := fromGoFlatExecutionState(ctx, cc, h, stack[7:37], v.State); err_ != nil {
 		return err_
 	}
 	return nil
@@ -2012,10 +1982,10 @@ func fromGoMemExecutionSnapshot(ctx context.Context, cc *host.CallContext, h *ho
 	if err_ := fromGoMemPlanReference(ctx, cc, h, ptr+8, v.PlanReference); err_ != nil {
 		return err_
 	}
-	if ok_ := cc.Memory().WriteUint64Le(ptr+32, v.Revision); !ok_ {
+	if ok_ := cc.Memory().WriteUint64Le(ptr+24, v.Revision); !ok_ {
 		return fmt.Errorf("wacogo/witgen: fromGoMemExecutionSnapshot: field Revision: bad memory write")
 	}
-	if err_ := fromGoMemExecutionState(ctx, cc, h, ptr+40, v.State); err_ != nil {
+	if err_ := fromGoMemExecutionState(ctx, cc, h, ptr+32, v.State); err_ != nil {
 		return err_
 	}
 	return nil
@@ -2030,13 +2000,13 @@ func liftFlatExecutionSnapshot(ctx context.Context, caller, callee *host.CallCon
 	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, err_ := liftFlatPlanReference(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:8]); err_ != nil {
+	if tmp_, err_ := liftFlatPlanReference(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:6]); err_ != nil {
 		return ExecutionSnapshot{}, err_
 	} else {
 		v_.PlanReference = tmp_
 	}
-	v_.Revision = stack[8]
-	if tmp_, err_ := liftFlatExecutionState(ctx, caller, callee, h, recT_.Fields[3].Type, stack[9:39]); err_ != nil {
+	v_.Revision = stack[6]
+	if tmp_, err_ := liftFlatExecutionState(ctx, caller, callee, h, recT_.Fields[3].Type, stack[7:37]); err_ != nil {
 		return ExecutionSnapshot{}, err_
 	} else {
 		v_.State = tmp_
@@ -2058,12 +2028,12 @@ func liftMemExecutionSnapshot(ctx context.Context, caller, callee *host.CallCont
 	} else {
 		v_.PlanReference = tmp_
 	}
-	if tmp_, ok_ := callee.Memory().ReadUint64Le(ptr + 32); !ok_ {
+	if tmp_, ok_ := callee.Memory().ReadUint64Le(ptr + 24); !ok_ {
 		return ExecutionSnapshot{}, fmt.Errorf("wacogo/witgen: liftMemExecutionSnapshot: field Revision: bad memory read")
 	} else {
 		v_.Revision = tmp_
 	}
-	if tmp_, err_ := liftMemExecutionState(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+40); err_ != nil {
+	if tmp_, err_ := liftMemExecutionState(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+32); err_ != nil {
 		return ExecutionSnapshot{}, err_
 	} else {
 		v_.State = tmp_
@@ -2077,11 +2047,11 @@ func lowerFlatExecutionSnapshot(ctx context.Context, caller, callee *host.CallCo
 	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatPlanReference(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:8], v.PlanReference); err_ != nil {
+	if err_ := lowerFlatPlanReference(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:6], v.PlanReference); err_ != nil {
 		return err_
 	}
-	stack[8] = v.Revision
-	if err_ := lowerFlatExecutionState(ctx, caller, callee, h, recT_.Fields[3].Type, stack[9:39], v.State); err_ != nil {
+	stack[6] = v.Revision
+	if err_ := lowerFlatExecutionState(ctx, caller, callee, h, recT_.Fields[3].Type, stack[7:37], v.State); err_ != nil {
 		return err_
 	}
 	return nil
@@ -2096,10 +2066,10 @@ func lowerMemExecutionSnapshot(ctx context.Context, caller, callee *host.CallCon
 	if err_ := lowerMemPlanReference(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8, v.PlanReference); err_ != nil {
 		return err_
 	}
-	if ok_ := callee.Memory().WriteUint64Le(ptr+32, v.Revision); !ok_ {
+	if ok_ := callee.Memory().WriteUint64Le(ptr+24, v.Revision); !ok_ {
 		return fmt.Errorf("wacogo/witgen: lowerMemExecutionSnapshot: field Revision: bad memory write")
 	}
-	if err_ := lowerMemExecutionState(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+40, v.State); err_ != nil {
+	if err_ := lowerMemExecutionState(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+32, v.State); err_ != nil {
 		return err_
 	}
 	return nil
@@ -2112,19 +2082,14 @@ func toGoFlatExecutionStartedEvent(ctx context.Context, cc *host.CallContext, h 
 	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
-		return ExecutionStartedEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, err_ := toGoFlatPlanReference(ctx, cc, h, recT_.Fields[2].Type, stack[4:10]); err_ != nil {
+	if tmp_, err_ := toGoFlatPlanReference(ctx, cc, h, recT_.Fields[1].Type, stack[2:6]); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
 		v_.PlanReference = tmp_
 	}
-	if tmp_, err_ := toGoFlatPayload(ctx, cc, h, recT_.Fields[3].Type, stack[10:14]); err_ != nil {
+	if tmp_, err_ := toGoFlatPayload(ctx, cc, h, recT_.Fields[2].Type, stack[6:10]); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
 		v_.Input = tmp_
@@ -2139,19 +2104,14 @@ func toGoMemExecutionStartedEvent(ctx context.Context, cc *host.CallContext, h *
 	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
-		return ExecutionStartedEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, err_ := toGoMemPlanReference(ctx, cc, h, recT_.Fields[2].Type, ptr+16); err_ != nil {
+	if tmp_, err_ := toGoMemPlanReference(ctx, cc, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
 		v_.PlanReference = tmp_
 	}
-	if tmp_, err_ := toGoMemPayload(ctx, cc, h, recT_.Fields[3].Type, ptr+36); err_ != nil {
+	if tmp_, err_ := toGoMemPayload(ctx, cc, h, recT_.Fields[2].Type, ptr+24); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
 		v_.Input = tmp_
@@ -2160,32 +2120,26 @@ func toGoMemExecutionStartedEvent(ctx context.Context, cc *host.CallContext, h *
 }
 
 func fromGoFlatExecutionStartedEvent(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, stack []uint64, v ExecutionStartedEvent) error {
-	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.EventID); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[2:4], v.ExecutionID); err_ != nil {
+	if err_ := fromGoFlatPlanReference(ctx, cc, h, stack[2:6], v.PlanReference); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatPlanReference(ctx, cc, h, stack[4:10], v.PlanReference); err_ != nil {
-		return err_
-	}
-	if err_ := fromGoFlatPayload(ctx, cc, h, stack[10:14], v.Input); err_ != nil {
+	if err_ := fromGoFlatPayload(ctx, cc, h, stack[6:10], v.Input); err_ != nil {
 		return err_
 	}
 	return nil
 }
 
 func fromGoMemExecutionStartedEvent(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, ptr uint32, v ExecutionStartedEvent) error {
-	if err_ := fromGoMemString(ctx, cc, h, ptr, v.EventID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr, v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+8, v.ExecutionID); err_ != nil {
+	if err_ := fromGoMemPlanReference(ctx, cc, h, ptr+8, v.PlanReference); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemPlanReference(ctx, cc, h, ptr+16, v.PlanReference); err_ != nil {
-		return err_
-	}
-	if err_ := fromGoMemPayload(ctx, cc, h, ptr+36, v.Input); err_ != nil {
+	if err_ := fromGoMemPayload(ctx, cc, h, ptr+24, v.Input); err_ != nil {
 		return err_
 	}
 	return nil
@@ -2198,19 +2152,14 @@ func liftFlatExecutionStartedEvent(ctx context.Context, caller, callee *host.Cal
 	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
-		return ExecutionStartedEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, err_ := liftFlatPlanReference(ctx, caller, callee, h, recT_.Fields[2].Type, stack[4:10]); err_ != nil {
+	if tmp_, err_ := liftFlatPlanReference(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:6]); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
 		v_.PlanReference = tmp_
 	}
-	if tmp_, err_ := liftFlatPayload(ctx, caller, callee, h, recT_.Fields[3].Type, stack[10:14]); err_ != nil {
+	if tmp_, err_ := liftFlatPayload(ctx, caller, callee, h, recT_.Fields[2].Type, stack[6:10]); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
 		v_.Input = tmp_
@@ -2225,19 +2174,14 @@ func liftMemExecutionStartedEvent(ctx context.Context, caller, callee *host.Call
 	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
-		return ExecutionStartedEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, err_ := liftMemPlanReference(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+16); err_ != nil {
+	if tmp_, err_ := liftMemPlanReference(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
 		v_.PlanReference = tmp_
 	}
-	if tmp_, err_ := liftMemPayload(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+36); err_ != nil {
+	if tmp_, err_ := liftMemPayload(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+24); err_ != nil {
 		return ExecutionStartedEvent{}, err_
 	} else {
 		v_.Input = tmp_
@@ -2248,16 +2192,13 @@ func liftMemExecutionStartedEvent(ctx context.Context, caller, callee *host.Call
 func lowerFlatExecutionStartedEvent(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64, v ExecutionStartedEvent) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.EventID); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4], v.ExecutionID); err_ != nil {
+	if err_ := lowerFlatPlanReference(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:6], v.PlanReference); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatPlanReference(ctx, caller, callee, h, recT_.Fields[2].Type, stack[4:10], v.PlanReference); err_ != nil {
-		return err_
-	}
-	if err_ := lowerFlatPayload(ctx, caller, callee, h, recT_.Fields[3].Type, stack[10:14], v.Input); err_ != nil {
+	if err_ := lowerFlatPayload(ctx, caller, callee, h, recT_.Fields[2].Type, stack[6:10], v.Input); err_ != nil {
 		return err_
 	}
 	return nil
@@ -2266,16 +2207,13 @@ func lowerFlatExecutionStartedEvent(ctx context.Context, caller, callee *host.Ca
 func lowerMemExecutionStartedEvent(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, ptr uint32, v ExecutionStartedEvent) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.EventID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8, v.ExecutionID); err_ != nil {
+	if err_ := lowerMemPlanReference(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8, v.PlanReference); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemPlanReference(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+16, v.PlanReference); err_ != nil {
-		return err_
-	}
-	if err_ := lowerMemPayload(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+36, v.Input); err_ != nil {
+	if err_ := lowerMemPayload(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+24, v.Input); err_ != nil {
 		return err_
 	}
 	return nil
@@ -4426,36 +4364,31 @@ func toGoFlatNodeAttemptFailedEvent(ctx context.Context, cc *host.CallContext, h
 	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
-		return NodeAttemptFailedEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	v_.ExpectedRevision = stack[4]
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
+	v_.ExpectedRevision = stack[2]
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[2].Type, stack[3:5]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[4].Type, stack[7:9]); err_ != nil {
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.AttemptID = tmp_
 	}
-	v_.AttemptNumber = uint32(stack[9])
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[6].Type, stack[10:12]); err_ != nil {
+	v_.AttemptNumber = uint32(stack[7])
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[5].Type, stack[8:10]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.EffectID = tmp_
 	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[7].Type, stack[12:14]); err_ != nil {
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[6].Type, stack[10:12]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.NodeID = tmp_
 	}
-	if tmp_, err_ := toGoFlatAttemptFailure(ctx, cc, h, recT_.Fields[8].Type, stack[14:21]); err_ != nil {
+	if tmp_, err_ := toGoFlatAttemptFailure(ctx, cc, h, recT_.Fields[7].Type, stack[12:19]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.Failure = tmp_
@@ -4470,44 +4403,39 @@ func toGoMemNodeAttemptFailedEvent(ctx context.Context, cc *host.CallContext, h 
 	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
-		return NodeAttemptFailedEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, ok_ := cc.Memory().ReadUint64Le(ptr + 16); !ok_ {
+	if tmp_, ok_ := cc.Memory().ReadUint64Le(ptr + 8); !ok_ {
 		return NodeAttemptFailedEvent{}, fmt.Errorf("wacogo/witgen: toGoMemNodeAttemptFailedEvent: field ExpectedRevision: bad memory read")
 	} else {
 		v_.ExpectedRevision = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[2].Type, ptr+16); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[4].Type, ptr+32); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.AttemptID = tmp_
 	}
-	if tmp_, ok_ := cc.Memory().ReadUint32Le(ptr + 40); !ok_ {
+	if tmp_, ok_ := cc.Memory().ReadUint32Le(ptr + 32); !ok_ {
 		return NodeAttemptFailedEvent{}, fmt.Errorf("wacogo/witgen: toGoMemNodeAttemptFailedEvent: field AttemptNumber: bad memory read")
 	} else {
 		v_.AttemptNumber = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[6].Type, ptr+44); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[5].Type, ptr+36); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.EffectID = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[7].Type, ptr+52); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[6].Type, ptr+44); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.NodeID = tmp_
 	}
-	if tmp_, err_ := toGoMemAttemptFailure(ctx, cc, h, recT_.Fields[8].Type, ptr+60); err_ != nil {
+	if tmp_, err_ := toGoMemAttemptFailure(ctx, cc, h, recT_.Fields[7].Type, ptr+52); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.Failure = tmp_
@@ -4516,58 +4444,52 @@ func toGoMemNodeAttemptFailedEvent(ctx context.Context, cc *host.CallContext, h 
 }
 
 func fromGoFlatNodeAttemptFailedEvent(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, stack []uint64, v NodeAttemptFailedEvent) error {
-	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.EventID); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[2:4], v.ExecutionID); err_ != nil {
+	stack[2] = v.ExpectedRevision
+	if err_ := fromGoFlatString(ctx, cc, h, stack[3:5], v.ActivationID); err_ != nil {
 		return err_
 	}
-	stack[4] = v.ExpectedRevision
-	if err_ := fromGoFlatString(ctx, cc, h, stack[5:7], v.ActivationID); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[5:7], v.AttemptID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[7:9], v.AttemptID); err_ != nil {
+	stack[7] = uint64(v.AttemptNumber)
+	if err_ := fromGoFlatString(ctx, cc, h, stack[8:10], v.EffectID); err_ != nil {
 		return err_
 	}
-	stack[9] = uint64(v.AttemptNumber)
-	if err_ := fromGoFlatString(ctx, cc, h, stack[10:12], v.EffectID); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[10:12], v.NodeID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[12:14], v.NodeID); err_ != nil {
-		return err_
-	}
-	if err_ := fromGoFlatAttemptFailure(ctx, cc, h, stack[14:21], v.Failure); err_ != nil {
+	if err_ := fromGoFlatAttemptFailure(ctx, cc, h, stack[12:19], v.Failure); err_ != nil {
 		return err_
 	}
 	return nil
 }
 
 func fromGoMemNodeAttemptFailedEvent(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, ptr uint32, v NodeAttemptFailedEvent) error {
-	if err_ := fromGoMemString(ctx, cc, h, ptr, v.EventID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr, v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+8, v.ExecutionID); err_ != nil {
-		return err_
-	}
-	if ok_ := cc.Memory().WriteUint64Le(ptr+16, v.ExpectedRevision); !ok_ {
+	if ok_ := cc.Memory().WriteUint64Le(ptr+8, v.ExpectedRevision); !ok_ {
 		return fmt.Errorf("wacogo/witgen: fromGoMemNodeAttemptFailedEvent: field ExpectedRevision: bad memory write")
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+24, v.ActivationID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+16, v.ActivationID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+32, v.AttemptID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+24, v.AttemptID); err_ != nil {
 		return err_
 	}
-	if ok_ := cc.Memory().WriteUint32Le(ptr+40, v.AttemptNumber); !ok_ {
+	if ok_ := cc.Memory().WriteUint32Le(ptr+32, v.AttemptNumber); !ok_ {
 		return fmt.Errorf("wacogo/witgen: fromGoMemNodeAttemptFailedEvent: field AttemptNumber: bad memory write")
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+44, v.EffectID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+36, v.EffectID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+52, v.NodeID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+44, v.NodeID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemAttemptFailure(ctx, cc, h, ptr+60, v.Failure); err_ != nil {
+	if err_ := fromGoMemAttemptFailure(ctx, cc, h, ptr+52, v.Failure); err_ != nil {
 		return err_
 	}
 	return nil
@@ -4580,36 +4502,31 @@ func liftFlatNodeAttemptFailedEvent(ctx context.Context, caller, callee *host.Ca
 	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
-		return NodeAttemptFailedEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	v_.ExpectedRevision = stack[4]
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
+	v_.ExpectedRevision = stack[2]
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[2].Type, stack[3:5]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[4].Type, stack[7:9]); err_ != nil {
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.AttemptID = tmp_
 	}
-	v_.AttemptNumber = uint32(stack[9])
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[6].Type, stack[10:12]); err_ != nil {
+	v_.AttemptNumber = uint32(stack[7])
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[5].Type, stack[8:10]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.EffectID = tmp_
 	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[7].Type, stack[12:14]); err_ != nil {
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[6].Type, stack[10:12]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.NodeID = tmp_
 	}
-	if tmp_, err_ := liftFlatAttemptFailure(ctx, caller, callee, h, recT_.Fields[8].Type, stack[14:21]); err_ != nil {
+	if tmp_, err_ := liftFlatAttemptFailure(ctx, caller, callee, h, recT_.Fields[7].Type, stack[12:19]); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.Failure = tmp_
@@ -4624,44 +4541,39 @@ func liftMemNodeAttemptFailedEvent(ctx context.Context, caller, callee *host.Cal
 	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
-		return NodeAttemptFailedEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, ok_ := callee.Memory().ReadUint64Le(ptr + 16); !ok_ {
+	if tmp_, ok_ := callee.Memory().ReadUint64Le(ptr + 8); !ok_ {
 		return NodeAttemptFailedEvent{}, fmt.Errorf("wacogo/witgen: liftMemNodeAttemptFailedEvent: field ExpectedRevision: bad memory read")
 	} else {
 		v_.ExpectedRevision = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+16); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[4].Type, ptr+32); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.AttemptID = tmp_
 	}
-	if tmp_, ok_ := callee.Memory().ReadUint32Le(ptr + 40); !ok_ {
+	if tmp_, ok_ := callee.Memory().ReadUint32Le(ptr + 32); !ok_ {
 		return NodeAttemptFailedEvent{}, fmt.Errorf("wacogo/witgen: liftMemNodeAttemptFailedEvent: field AttemptNumber: bad memory read")
 	} else {
 		v_.AttemptNumber = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[6].Type, ptr+44); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[5].Type, ptr+36); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.EffectID = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[7].Type, ptr+52); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[6].Type, ptr+44); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.NodeID = tmp_
 	}
-	if tmp_, err_ := liftMemAttemptFailure(ctx, caller, callee, h, recT_.Fields[8].Type, ptr+60); err_ != nil {
+	if tmp_, err_ := liftMemAttemptFailure(ctx, caller, callee, h, recT_.Fields[7].Type, ptr+52); err_ != nil {
 		return NodeAttemptFailedEvent{}, err_
 	} else {
 		v_.Failure = tmp_
@@ -4672,27 +4584,24 @@ func liftMemNodeAttemptFailedEvent(ctx context.Context, caller, callee *host.Cal
 func lowerFlatNodeAttemptFailedEvent(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64, v NodeAttemptFailedEvent) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.EventID); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4], v.ExecutionID); err_ != nil {
+	stack[2] = v.ExpectedRevision
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[2].Type, stack[3:5], v.ActivationID); err_ != nil {
 		return err_
 	}
-	stack[4] = v.ExpectedRevision
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7], v.ActivationID); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7], v.AttemptID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[4].Type, stack[7:9], v.AttemptID); err_ != nil {
+	stack[7] = uint64(v.AttemptNumber)
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[5].Type, stack[8:10], v.EffectID); err_ != nil {
 		return err_
 	}
-	stack[9] = uint64(v.AttemptNumber)
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[6].Type, stack[10:12], v.EffectID); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[6].Type, stack[10:12], v.NodeID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[7].Type, stack[12:14], v.NodeID); err_ != nil {
-		return err_
-	}
-	if err_ := lowerFlatAttemptFailure(ctx, caller, callee, h, recT_.Fields[8].Type, stack[14:21], v.Failure); err_ != nil {
+	if err_ := lowerFlatAttemptFailure(ctx, caller, callee, h, recT_.Fields[7].Type, stack[12:19], v.Failure); err_ != nil {
 		return err_
 	}
 	return nil
@@ -4701,31 +4610,28 @@ func lowerFlatNodeAttemptFailedEvent(ctx context.Context, caller, callee *host.C
 func lowerMemNodeAttemptFailedEvent(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, ptr uint32, v NodeAttemptFailedEvent) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.EventID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8, v.ExecutionID); err_ != nil {
-		return err_
-	}
-	if ok_ := callee.Memory().WriteUint64Le(ptr+16, v.ExpectedRevision); !ok_ {
+	if ok_ := callee.Memory().WriteUint64Le(ptr+8, v.ExpectedRevision); !ok_ {
 		return fmt.Errorf("wacogo/witgen: lowerMemNodeAttemptFailedEvent: field ExpectedRevision: bad memory write")
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24, v.ActivationID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+16, v.ActivationID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[4].Type, ptr+32, v.AttemptID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24, v.AttemptID); err_ != nil {
 		return err_
 	}
-	if ok_ := callee.Memory().WriteUint32Le(ptr+40, v.AttemptNumber); !ok_ {
+	if ok_ := callee.Memory().WriteUint32Le(ptr+32, v.AttemptNumber); !ok_ {
 		return fmt.Errorf("wacogo/witgen: lowerMemNodeAttemptFailedEvent: field AttemptNumber: bad memory write")
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[6].Type, ptr+44, v.EffectID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[5].Type, ptr+36, v.EffectID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[7].Type, ptr+52, v.NodeID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[6].Type, ptr+44, v.NodeID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemAttemptFailure(ctx, caller, callee, h, recT_.Fields[8].Type, ptr+60, v.Failure); err_ != nil {
+	if err_ := lowerMemAttemptFailure(ctx, caller, callee, h, recT_.Fields[7].Type, ptr+52, v.Failure); err_ != nil {
 		return err_
 	}
 	return nil
@@ -4738,36 +4644,31 @@ func toGoFlatNodeAttemptSucceededEvent(ctx context.Context, cc *host.CallContext
 	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
-		return NodeAttemptSucceededEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	v_.ExpectedRevision = stack[4]
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
+	v_.ExpectedRevision = stack[2]
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[2].Type, stack[3:5]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[4].Type, stack[7:9]); err_ != nil {
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.AttemptID = tmp_
 	}
-	v_.AttemptNumber = uint32(stack[9])
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[6].Type, stack[10:12]); err_ != nil {
+	v_.AttemptNumber = uint32(stack[7])
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[5].Type, stack[8:10]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.EffectID = tmp_
 	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[7].Type, stack[12:14]); err_ != nil {
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[6].Type, stack[10:12]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.NodeID = tmp_
 	}
-	if tmp_, err_ := toGoFlatPayload(ctx, cc, h, recT_.Fields[8].Type, stack[14:18]); err_ != nil {
+	if tmp_, err_ := toGoFlatPayload(ctx, cc, h, recT_.Fields[7].Type, stack[12:16]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.Output = tmp_
@@ -4782,44 +4683,39 @@ func toGoMemNodeAttemptSucceededEvent(ctx context.Context, cc *host.CallContext,
 	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
-		return NodeAttemptSucceededEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, ok_ := cc.Memory().ReadUint64Le(ptr + 16); !ok_ {
+	if tmp_, ok_ := cc.Memory().ReadUint64Le(ptr + 8); !ok_ {
 		return NodeAttemptSucceededEvent{}, fmt.Errorf("wacogo/witgen: toGoMemNodeAttemptSucceededEvent: field ExpectedRevision: bad memory read")
 	} else {
 		v_.ExpectedRevision = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[2].Type, ptr+16); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[4].Type, ptr+32); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.AttemptID = tmp_
 	}
-	if tmp_, ok_ := cc.Memory().ReadUint32Le(ptr + 40); !ok_ {
+	if tmp_, ok_ := cc.Memory().ReadUint32Le(ptr + 32); !ok_ {
 		return NodeAttemptSucceededEvent{}, fmt.Errorf("wacogo/witgen: toGoMemNodeAttemptSucceededEvent: field AttemptNumber: bad memory read")
 	} else {
 		v_.AttemptNumber = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[6].Type, ptr+44); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[5].Type, ptr+36); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.EffectID = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[7].Type, ptr+52); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[6].Type, ptr+44); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.NodeID = tmp_
 	}
-	if tmp_, err_ := toGoMemPayload(ctx, cc, h, recT_.Fields[8].Type, ptr+60); err_ != nil {
+	if tmp_, err_ := toGoMemPayload(ctx, cc, h, recT_.Fields[7].Type, ptr+52); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.Output = tmp_
@@ -4828,58 +4724,52 @@ func toGoMemNodeAttemptSucceededEvent(ctx context.Context, cc *host.CallContext,
 }
 
 func fromGoFlatNodeAttemptSucceededEvent(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, stack []uint64, v NodeAttemptSucceededEvent) error {
-	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.EventID); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[2:4], v.ExecutionID); err_ != nil {
+	stack[2] = v.ExpectedRevision
+	if err_ := fromGoFlatString(ctx, cc, h, stack[3:5], v.ActivationID); err_ != nil {
 		return err_
 	}
-	stack[4] = v.ExpectedRevision
-	if err_ := fromGoFlatString(ctx, cc, h, stack[5:7], v.ActivationID); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[5:7], v.AttemptID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[7:9], v.AttemptID); err_ != nil {
+	stack[7] = uint64(v.AttemptNumber)
+	if err_ := fromGoFlatString(ctx, cc, h, stack[8:10], v.EffectID); err_ != nil {
 		return err_
 	}
-	stack[9] = uint64(v.AttemptNumber)
-	if err_ := fromGoFlatString(ctx, cc, h, stack[10:12], v.EffectID); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[10:12], v.NodeID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[12:14], v.NodeID); err_ != nil {
-		return err_
-	}
-	if err_ := fromGoFlatPayload(ctx, cc, h, stack[14:18], v.Output); err_ != nil {
+	if err_ := fromGoFlatPayload(ctx, cc, h, stack[12:16], v.Output); err_ != nil {
 		return err_
 	}
 	return nil
 }
 
 func fromGoMemNodeAttemptSucceededEvent(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, ptr uint32, v NodeAttemptSucceededEvent) error {
-	if err_ := fromGoMemString(ctx, cc, h, ptr, v.EventID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr, v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+8, v.ExecutionID); err_ != nil {
-		return err_
-	}
-	if ok_ := cc.Memory().WriteUint64Le(ptr+16, v.ExpectedRevision); !ok_ {
+	if ok_ := cc.Memory().WriteUint64Le(ptr+8, v.ExpectedRevision); !ok_ {
 		return fmt.Errorf("wacogo/witgen: fromGoMemNodeAttemptSucceededEvent: field ExpectedRevision: bad memory write")
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+24, v.ActivationID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+16, v.ActivationID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+32, v.AttemptID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+24, v.AttemptID); err_ != nil {
 		return err_
 	}
-	if ok_ := cc.Memory().WriteUint32Le(ptr+40, v.AttemptNumber); !ok_ {
+	if ok_ := cc.Memory().WriteUint32Le(ptr+32, v.AttemptNumber); !ok_ {
 		return fmt.Errorf("wacogo/witgen: fromGoMemNodeAttemptSucceededEvent: field AttemptNumber: bad memory write")
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+44, v.EffectID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+36, v.EffectID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+52, v.NodeID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+44, v.NodeID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemPayload(ctx, cc, h, ptr+60, v.Output); err_ != nil {
+	if err_ := fromGoMemPayload(ctx, cc, h, ptr+52, v.Output); err_ != nil {
 		return err_
 	}
 	return nil
@@ -4892,36 +4782,31 @@ func liftFlatNodeAttemptSucceededEvent(ctx context.Context, caller, callee *host
 	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
-		return NodeAttemptSucceededEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	v_.ExpectedRevision = stack[4]
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
+	v_.ExpectedRevision = stack[2]
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[2].Type, stack[3:5]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[4].Type, stack[7:9]); err_ != nil {
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.AttemptID = tmp_
 	}
-	v_.AttemptNumber = uint32(stack[9])
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[6].Type, stack[10:12]); err_ != nil {
+	v_.AttemptNumber = uint32(stack[7])
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[5].Type, stack[8:10]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.EffectID = tmp_
 	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[7].Type, stack[12:14]); err_ != nil {
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[6].Type, stack[10:12]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.NodeID = tmp_
 	}
-	if tmp_, err_ := liftFlatPayload(ctx, caller, callee, h, recT_.Fields[8].Type, stack[14:18]); err_ != nil {
+	if tmp_, err_ := liftFlatPayload(ctx, caller, callee, h, recT_.Fields[7].Type, stack[12:16]); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.Output = tmp_
@@ -4936,44 +4821,39 @@ func liftMemNodeAttemptSucceededEvent(ctx context.Context, caller, callee *host.
 	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
-		return NodeAttemptSucceededEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, ok_ := callee.Memory().ReadUint64Le(ptr + 16); !ok_ {
+	if tmp_, ok_ := callee.Memory().ReadUint64Le(ptr + 8); !ok_ {
 		return NodeAttemptSucceededEvent{}, fmt.Errorf("wacogo/witgen: liftMemNodeAttemptSucceededEvent: field ExpectedRevision: bad memory read")
 	} else {
 		v_.ExpectedRevision = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+16); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[4].Type, ptr+32); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.AttemptID = tmp_
 	}
-	if tmp_, ok_ := callee.Memory().ReadUint32Le(ptr + 40); !ok_ {
+	if tmp_, ok_ := callee.Memory().ReadUint32Le(ptr + 32); !ok_ {
 		return NodeAttemptSucceededEvent{}, fmt.Errorf("wacogo/witgen: liftMemNodeAttemptSucceededEvent: field AttemptNumber: bad memory read")
 	} else {
 		v_.AttemptNumber = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[6].Type, ptr+44); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[5].Type, ptr+36); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.EffectID = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[7].Type, ptr+52); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[6].Type, ptr+44); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.NodeID = tmp_
 	}
-	if tmp_, err_ := liftMemPayload(ctx, caller, callee, h, recT_.Fields[8].Type, ptr+60); err_ != nil {
+	if tmp_, err_ := liftMemPayload(ctx, caller, callee, h, recT_.Fields[7].Type, ptr+52); err_ != nil {
 		return NodeAttemptSucceededEvent{}, err_
 	} else {
 		v_.Output = tmp_
@@ -4984,27 +4864,24 @@ func liftMemNodeAttemptSucceededEvent(ctx context.Context, caller, callee *host.
 func lowerFlatNodeAttemptSucceededEvent(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64, v NodeAttemptSucceededEvent) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.EventID); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4], v.ExecutionID); err_ != nil {
+	stack[2] = v.ExpectedRevision
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[2].Type, stack[3:5], v.ActivationID); err_ != nil {
 		return err_
 	}
-	stack[4] = v.ExpectedRevision
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7], v.ActivationID); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7], v.AttemptID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[4].Type, stack[7:9], v.AttemptID); err_ != nil {
+	stack[7] = uint64(v.AttemptNumber)
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[5].Type, stack[8:10], v.EffectID); err_ != nil {
 		return err_
 	}
-	stack[9] = uint64(v.AttemptNumber)
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[6].Type, stack[10:12], v.EffectID); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[6].Type, stack[10:12], v.NodeID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[7].Type, stack[12:14], v.NodeID); err_ != nil {
-		return err_
-	}
-	if err_ := lowerFlatPayload(ctx, caller, callee, h, recT_.Fields[8].Type, stack[14:18], v.Output); err_ != nil {
+	if err_ := lowerFlatPayload(ctx, caller, callee, h, recT_.Fields[7].Type, stack[12:16], v.Output); err_ != nil {
 		return err_
 	}
 	return nil
@@ -5013,31 +4890,28 @@ func lowerFlatNodeAttemptSucceededEvent(ctx context.Context, caller, callee *hos
 func lowerMemNodeAttemptSucceededEvent(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, ptr uint32, v NodeAttemptSucceededEvent) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.EventID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8, v.ExecutionID); err_ != nil {
-		return err_
-	}
-	if ok_ := callee.Memory().WriteUint64Le(ptr+16, v.ExpectedRevision); !ok_ {
+	if ok_ := callee.Memory().WriteUint64Le(ptr+8, v.ExpectedRevision); !ok_ {
 		return fmt.Errorf("wacogo/witgen: lowerMemNodeAttemptSucceededEvent: field ExpectedRevision: bad memory write")
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24, v.ActivationID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+16, v.ActivationID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[4].Type, ptr+32, v.AttemptID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24, v.AttemptID); err_ != nil {
 		return err_
 	}
-	if ok_ := callee.Memory().WriteUint32Le(ptr+40, v.AttemptNumber); !ok_ {
+	if ok_ := callee.Memory().WriteUint32Le(ptr+32, v.AttemptNumber); !ok_ {
 		return fmt.Errorf("wacogo/witgen: lowerMemNodeAttemptSucceededEvent: field AttemptNumber: bad memory write")
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[6].Type, ptr+44, v.EffectID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[5].Type, ptr+36, v.EffectID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[7].Type, ptr+52, v.NodeID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[6].Type, ptr+44, v.NodeID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemPayload(ctx, caller, callee, h, recT_.Fields[8].Type, ptr+60, v.Output); err_ != nil {
+	if err_ := lowerMemPayload(ctx, caller, callee, h, recT_.Fields[7].Type, ptr+52, v.Output); err_ != nil {
 		return err_
 	}
 	return nil
@@ -5182,7 +5056,7 @@ func toGoFlatOptionExecutionSnapshot(ctx context.Context, cc *host.CallContext, 
 	var out_ OptionExecutionSnapshot
 	if disc_ != 0 {
 		out_.IsSome = true
-		if tmp_, err_ := toGoFlatExecutionSnapshot(ctx, cc, h, optT_.Inner, stack[1:40]); err_ != nil {
+		if tmp_, err_ := toGoFlatExecutionSnapshot(ctx, cc, h, optT_.Inner, stack[1:38]); err_ != nil {
 			return OptionExecutionSnapshot{}, err_
 		} else {
 			out_.Value = tmp_
@@ -5215,7 +5089,7 @@ func toGoMemOptionExecutionSnapshot(ctx context.Context, cc *host.CallContext, h
 func fromGoFlatOptionExecutionSnapshot(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, stack []uint64, v OptionExecutionSnapshot) error {
 	if v.IsSome {
 		stack[0] = 1
-		if err_ := fromGoFlatExecutionSnapshot(ctx, cc, h, stack[1:40], v.Value); err_ != nil {
+		if err_ := fromGoFlatExecutionSnapshot(ctx, cc, h, stack[1:38], v.Value); err_ != nil {
 			return err_
 		}
 	} else {
@@ -5257,8 +5131,6 @@ func fromGoFlatOptionExecutionSnapshot(ctx context.Context, cc *host.CallContext
 		stack[35] = 0
 		stack[36] = 0
 		stack[37] = 0
-		stack[38] = 0
-		stack[39] = 0
 	}
 	return nil
 }
@@ -5286,7 +5158,7 @@ func liftFlatOptionExecutionSnapshot(ctx context.Context, caller, callee *host.C
 	var out_ OptionExecutionSnapshot
 	if disc_ != 0 {
 		out_.IsSome = true
-		if tmp_, err_ := liftFlatExecutionSnapshot(ctx, caller, callee, h, optT_.Inner, stack[1:40]); err_ != nil {
+		if tmp_, err_ := liftFlatExecutionSnapshot(ctx, caller, callee, h, optT_.Inner, stack[1:38]); err_ != nil {
 			return OptionExecutionSnapshot{}, err_
 		} else {
 			out_.Value = tmp_
@@ -5321,7 +5193,7 @@ func lowerFlatOptionExecutionSnapshot(ctx context.Context, caller, callee *host.
 	_ = optT_
 	if v.IsSome {
 		stack[0] = 1
-		if err_ := lowerFlatExecutionSnapshot(ctx, caller, callee, h, optT_.Inner, stack[1:40], v.Value); err_ != nil {
+		if err_ := lowerFlatExecutionSnapshot(ctx, caller, callee, h, optT_.Inner, stack[1:38], v.Value); err_ != nil {
 			return err_
 		}
 	} else {
@@ -5364,8 +5236,6 @@ func lowerFlatOptionExecutionSnapshot(ctx context.Context, caller, callee *host.
 		stack[35] = 0
 		stack[36] = 0
 		stack[37] = 0
-		stack[38] = 0
-		stack[39] = 0
 	}
 	return nil
 }
@@ -6071,17 +5941,12 @@ func toGoFlatPlanReference(ctx context.Context, cc *host.CallContext, h *host.Co
 	var v_ PlanReference
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if tmp_, err_ := toGoFlatSpecificationVersion(ctx, cc, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
-		return PlanReference{}, err_
-	} else {
-		v_.SpecificationVersion = tmp_
-	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return PlanReference{}, err_
 	} else {
 		v_.WorkflowID = tmp_
 	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[2].Type, stack[4:6]); err_ != nil {
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
 		return PlanReference{}, err_
 	} else {
 		v_.Fingerprint = tmp_
@@ -6093,17 +5958,12 @@ func toGoMemPlanReference(ctx context.Context, cc *host.CallContext, h *host.Com
 	var v_ PlanReference
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if tmp_, err_ := toGoMemSpecificationVersion(ctx, cc, h, recT_.Fields[0].Type, ptr); err_ != nil {
-		return PlanReference{}, err_
-	} else {
-		v_.SpecificationVersion = tmp_
-	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[1].Type, ptr+4); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return PlanReference{}, err_
 	} else {
 		v_.WorkflowID = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[2].Type, ptr+12); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
 		return PlanReference{}, err_
 	} else {
 		v_.Fingerprint = tmp_
@@ -6112,26 +5972,20 @@ func toGoMemPlanReference(ctx context.Context, cc *host.CallContext, h *host.Com
 }
 
 func fromGoFlatPlanReference(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, stack []uint64, v PlanReference) error {
-	if err_ := fromGoFlatSpecificationVersion(ctx, cc, h, stack[0:2], v.SpecificationVersion); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.WorkflowID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[2:4], v.WorkflowID); err_ != nil {
-		return err_
-	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[4:6], v.Fingerprint); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[2:4], v.Fingerprint); err_ != nil {
 		return err_
 	}
 	return nil
 }
 
 func fromGoMemPlanReference(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, ptr uint32, v PlanReference) error {
-	if err_ := fromGoMemSpecificationVersion(ctx, cc, h, ptr, v.SpecificationVersion); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr, v.WorkflowID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+4, v.WorkflowID); err_ != nil {
-		return err_
-	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+12, v.Fingerprint); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+8, v.Fingerprint); err_ != nil {
 		return err_
 	}
 	return nil
@@ -6141,17 +5995,12 @@ func liftFlatPlanReference(ctx context.Context, caller, callee *host.CallContext
 	var v_ PlanReference
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if tmp_, err_ := liftFlatSpecificationVersion(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
-		return PlanReference{}, err_
-	} else {
-		v_.SpecificationVersion = tmp_
-	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return PlanReference{}, err_
 	} else {
 		v_.WorkflowID = tmp_
 	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[2].Type, stack[4:6]); err_ != nil {
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
 		return PlanReference{}, err_
 	} else {
 		v_.Fingerprint = tmp_
@@ -6163,17 +6012,12 @@ func liftMemPlanReference(ctx context.Context, caller, callee *host.CallContext,
 	var v_ PlanReference
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if tmp_, err_ := liftMemSpecificationVersion(ctx, caller, callee, h, recT_.Fields[0].Type, ptr); err_ != nil {
-		return PlanReference{}, err_
-	} else {
-		v_.SpecificationVersion = tmp_
-	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+4); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return PlanReference{}, err_
 	} else {
 		v_.WorkflowID = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+12); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
 		return PlanReference{}, err_
 	} else {
 		v_.Fingerprint = tmp_
@@ -6184,13 +6028,10 @@ func liftMemPlanReference(ctx context.Context, caller, callee *host.CallContext,
 func lowerFlatPlanReference(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64, v PlanReference) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerFlatSpecificationVersion(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.SpecificationVersion); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.WorkflowID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4], v.WorkflowID); err_ != nil {
-		return err_
-	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[2].Type, stack[4:6], v.Fingerprint); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4], v.Fingerprint); err_ != nil {
 		return err_
 	}
 	return nil
@@ -6199,13 +6040,10 @@ func lowerFlatPlanReference(ctx context.Context, caller, callee *host.CallContex
 func lowerMemPlanReference(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, ptr uint32, v PlanReference) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerMemSpecificationVersion(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.SpecificationVersion); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.WorkflowID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+4, v.WorkflowID); err_ != nil {
-		return err_
-	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+12, v.Fingerprint); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8, v.Fingerprint); err_ != nil {
 		return err_
 	}
 	return nil
@@ -6217,7 +6055,7 @@ func toGoFlatResultExecutableWorkflowPlanListDiagnostic(ctx context.Context, cc 
 	disc_ := uint32(stack[0])
 	if disc_ == 0 {
 		var okVal_ ExecutableWorkflowPlan
-		if tmp_, err_ := toGoFlatExecutableWorkflowPlan(ctx, cc, h, resT_.Ok, stack[1:9]); err_ != nil {
+		if tmp_, err_ := toGoFlatExecutableWorkflowPlan(ctx, cc, h, resT_.Ok, stack[1:7]); err_ != nil {
 			return nil, err_
 		} else {
 			okVal_ = tmp_
@@ -6264,7 +6102,7 @@ func fromGoFlatResultExecutableWorkflowPlanListDiagnostic(ctx context.Context, c
 	switch x := v.(type) {
 	case ResultExecutableWorkflowPlanListDiagnosticOk:
 		stack[0] = 0
-		if err_ := fromGoFlatExecutableWorkflowPlan(ctx, cc, h, stack[1:9], x.Value); err_ != nil {
+		if err_ := fromGoFlatExecutableWorkflowPlan(ctx, cc, h, stack[1:7], x.Value); err_ != nil {
 			return err_
 		}
 	case ResultExecutableWorkflowPlanListDiagnosticErr:
@@ -6276,8 +6114,6 @@ func fromGoFlatResultExecutableWorkflowPlanListDiagnostic(ctx context.Context, c
 		stack[4] = 0
 		stack[5] = 0
 		stack[6] = 0
-		stack[7] = 0
-		stack[8] = 0
 	default:
 		return fmt.Errorf("wacogo/witgen: fromGoFlatResultExecutableWorkflowPlanListDiagnostic: unknown result case")
 	}
@@ -6312,7 +6148,7 @@ func liftFlatResultExecutableWorkflowPlanListDiagnostic(ctx context.Context, cal
 	disc_ := uint32(stack[0])
 	if disc_ == 0 {
 		var okVal_ ExecutableWorkflowPlan
-		if tmp_, err_ := liftFlatExecutableWorkflowPlan(ctx, caller, callee, h, resT_.Ok, stack[1:9]); err_ != nil {
+		if tmp_, err_ := liftFlatExecutableWorkflowPlan(ctx, caller, callee, h, resT_.Ok, stack[1:7]); err_ != nil {
 			return nil, err_
 		} else {
 			okVal_ = tmp_
@@ -6361,7 +6197,7 @@ func lowerFlatResultExecutableWorkflowPlanListDiagnostic(ctx context.Context, ca
 	switch x := v.(type) {
 	case ResultExecutableWorkflowPlanListDiagnosticOk:
 		stack[0] = 0
-		if err_ := lowerFlatExecutableWorkflowPlan(ctx, caller, callee, h, resT_.Ok, stack[1:9], x.Value); err_ != nil {
+		if err_ := lowerFlatExecutableWorkflowPlan(ctx, caller, callee, h, resT_.Ok, stack[1:7], x.Value); err_ != nil {
 			return err_
 		}
 	case ResultExecutableWorkflowPlanListDiagnosticErr:
@@ -6373,8 +6209,6 @@ func lowerFlatResultExecutableWorkflowPlanListDiagnostic(ctx context.Context, ca
 		stack[4] = 0
 		stack[5] = 0
 		stack[6] = 0
-		stack[7] = 0
-		stack[8] = 0
 	default:
 		return fmt.Errorf("wacogo/witgen: lowerFlatResultExecutableWorkflowPlanListDiagnostic: unknown result case")
 	}
@@ -6411,7 +6245,7 @@ func toGoFlatResultTransitionResultEngineError(ctx context.Context, cc *host.Cal
 	disc_ := uint32(stack[0])
 	if disc_ == 0 {
 		var okVal_ TransitionResult
-		if tmp_, err_ := toGoFlatTransitionResult(ctx, cc, h, resT_.Ok, stack[1:42]); err_ != nil {
+		if tmp_, err_ := toGoFlatTransitionResult(ctx, cc, h, resT_.Ok, stack[1:40]); err_ != nil {
 			return nil, err_
 		} else {
 			okVal_ = tmp_
@@ -6458,7 +6292,7 @@ func fromGoFlatResultTransitionResultEngineError(ctx context.Context, cc *host.C
 	switch x := v.(type) {
 	case ResultTransitionResultEngineErrorOk:
 		stack[0] = 0
-		if err_ := fromGoFlatTransitionResult(ctx, cc, h, stack[1:42], x.Value); err_ != nil {
+		if err_ := fromGoFlatTransitionResult(ctx, cc, h, stack[1:40], x.Value); err_ != nil {
 			return err_
 		}
 	case ResultTransitionResultEngineErrorErr:
@@ -6501,8 +6335,6 @@ func fromGoFlatResultTransitionResultEngineError(ctx context.Context, cc *host.C
 		stack[37] = 0
 		stack[38] = 0
 		stack[39] = 0
-		stack[40] = 0
-		stack[41] = 0
 	default:
 		return fmt.Errorf("wacogo/witgen: fromGoFlatResultTransitionResultEngineError: unknown result case")
 	}
@@ -6537,7 +6369,7 @@ func liftFlatResultTransitionResultEngineError(ctx context.Context, caller, call
 	disc_ := uint32(stack[0])
 	if disc_ == 0 {
 		var okVal_ TransitionResult
-		if tmp_, err_ := liftFlatTransitionResult(ctx, caller, callee, h, resT_.Ok, stack[1:42]); err_ != nil {
+		if tmp_, err_ := liftFlatTransitionResult(ctx, caller, callee, h, resT_.Ok, stack[1:40]); err_ != nil {
 			return nil, err_
 		} else {
 			okVal_ = tmp_
@@ -6586,7 +6418,7 @@ func lowerFlatResultTransitionResultEngineError(ctx context.Context, caller, cal
 	switch x := v.(type) {
 	case ResultTransitionResultEngineErrorOk:
 		stack[0] = 0
-		if err_ := lowerFlatTransitionResult(ctx, caller, callee, h, resT_.Ok, stack[1:42], x.Value); err_ != nil {
+		if err_ := lowerFlatTransitionResult(ctx, caller, callee, h, resT_.Ok, stack[1:40], x.Value); err_ != nil {
 			return err_
 		}
 	case ResultTransitionResultEngineErrorErr:
@@ -6629,8 +6461,6 @@ func lowerFlatResultTransitionResultEngineError(ctx context.Context, caller, cal
 		stack[37] = 0
 		stack[38] = 0
 		stack[39] = 0
-		stack[40] = 0
-		stack[41] = 0
 	default:
 		return fmt.Errorf("wacogo/witgen: lowerFlatResultTransitionResultEngineError: unknown result case")
 	}
@@ -7193,94 +7023,6 @@ func lowerMemScheduleTimerEffect(ctx context.Context, caller, callee *host.CallC
 	return nil
 }
 
-func toGoFlatSpecificationVersion(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64) (SpecificationVersion, error) {
-	var v_ SpecificationVersion
-	recT_ := ty.(wacogo.TypeRecord)
-	_ = recT_
-	v_.Major = uint16(stack[0])
-	v_.Minor = uint16(stack[1])
-	return v_, nil
-}
-
-func toGoMemSpecificationVersion(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, ptr uint32) (SpecificationVersion, error) {
-	var v_ SpecificationVersion
-	recT_ := ty.(wacogo.TypeRecord)
-	_ = recT_
-	if tmp_, ok_ := cc.Memory().ReadUint16Le(ptr); !ok_ {
-		return SpecificationVersion{}, fmt.Errorf("wacogo/witgen: toGoMemSpecificationVersion: field Major: bad memory read")
-	} else {
-		v_.Major = tmp_
-	}
-	if tmp_, ok_ := cc.Memory().ReadUint16Le(ptr + 2); !ok_ {
-		return SpecificationVersion{}, fmt.Errorf("wacogo/witgen: toGoMemSpecificationVersion: field Minor: bad memory read")
-	} else {
-		v_.Minor = tmp_
-	}
-	return v_, nil
-}
-
-func fromGoFlatSpecificationVersion(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, stack []uint64, v SpecificationVersion) error {
-	stack[0] = uint64(v.Major)
-	stack[1] = uint64(v.Minor)
-	return nil
-}
-
-func fromGoMemSpecificationVersion(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, ptr uint32, v SpecificationVersion) error {
-	if ok_ := cc.Memory().WriteUint16Le(ptr, v.Major); !ok_ {
-		return fmt.Errorf("wacogo/witgen: fromGoMemSpecificationVersion: field Major: bad memory write")
-	}
-	if ok_ := cc.Memory().WriteUint16Le(ptr+2, v.Minor); !ok_ {
-		return fmt.Errorf("wacogo/witgen: fromGoMemSpecificationVersion: field Minor: bad memory write")
-	}
-	return nil
-}
-
-func liftFlatSpecificationVersion(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64) (SpecificationVersion, error) {
-	var v_ SpecificationVersion
-	recT_ := ty.(wacogo.TypeRecord)
-	_ = recT_
-	v_.Major = uint16(stack[0])
-	v_.Minor = uint16(stack[1])
-	return v_, nil
-}
-
-func liftMemSpecificationVersion(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, ptr uint32) (SpecificationVersion, error) {
-	var v_ SpecificationVersion
-	recT_ := ty.(wacogo.TypeRecord)
-	_ = recT_
-	if tmp_, ok_ := callee.Memory().ReadUint16Le(ptr); !ok_ {
-		return SpecificationVersion{}, fmt.Errorf("wacogo/witgen: liftMemSpecificationVersion: field Major: bad memory read")
-	} else {
-		v_.Major = tmp_
-	}
-	if tmp_, ok_ := callee.Memory().ReadUint16Le(ptr + 2); !ok_ {
-		return SpecificationVersion{}, fmt.Errorf("wacogo/witgen: liftMemSpecificationVersion: field Minor: bad memory read")
-	} else {
-		v_.Minor = tmp_
-	}
-	return v_, nil
-}
-
-func lowerFlatSpecificationVersion(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64, v SpecificationVersion) error {
-	recT_ := ty.(wacogo.TypeRecord)
-	_ = recT_
-	stack[0] = uint64(v.Major)
-	stack[1] = uint64(v.Minor)
-	return nil
-}
-
-func lowerMemSpecificationVersion(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, ptr uint32, v SpecificationVersion) error {
-	recT_ := ty.(wacogo.TypeRecord)
-	_ = recT_
-	if ok_ := callee.Memory().WriteUint16Le(ptr, v.Major); !ok_ {
-		return fmt.Errorf("wacogo/witgen: lowerMemSpecificationVersion: field Major: bad memory write")
-	}
-	if ok_ := callee.Memory().WriteUint16Le(ptr+2, v.Minor); !ok_ {
-		return fmt.Errorf("wacogo/witgen: lowerMemSpecificationVersion: field Minor: bad memory write")
-	}
-	return nil
-}
-
 func toGoFlatString(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64) (string, error) {
 	_ = ty
 	ptr_ := uint32(stack[0])
@@ -7414,25 +7156,20 @@ func toGoFlatTimerFiredEvent(ctx context.Context, cc *host.CallContext, h *host.
 	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
-		return TimerFiredEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	v_.ExpectedRevision = stack[4]
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
+	v_.ExpectedRevision = stack[2]
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[2].Type, stack[3:5]); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
 		v_.TimerID = tmp_
 	}
-	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[4].Type, stack[7:9]); err_ != nil {
+	if tmp_, err_ := toGoFlatString(ctx, cc, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	v_.NextAttemptNumber = uint32(stack[9])
+	v_.NextAttemptNumber = uint32(stack[7])
 	return v_, nil
 }
 
@@ -7443,29 +7180,24 @@ func toGoMemTimerFiredEvent(ctx context.Context, cc *host.CallContext, h *host.C
 	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
-		return TimerFiredEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, ok_ := cc.Memory().ReadUint64Le(ptr + 16); !ok_ {
+	if tmp_, ok_ := cc.Memory().ReadUint64Le(ptr + 8); !ok_ {
 		return TimerFiredEvent{}, fmt.Errorf("wacogo/witgen: toGoMemTimerFiredEvent: field ExpectedRevision: bad memory read")
 	} else {
 		v_.ExpectedRevision = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[2].Type, ptr+16); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
 		v_.TimerID = tmp_
 	}
-	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[4].Type, ptr+32); err_ != nil {
+	if tmp_, err_ := toGoMemString(ctx, cc, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	if tmp_, ok_ := cc.Memory().ReadUint32Le(ptr + 40); !ok_ {
+	if tmp_, ok_ := cc.Memory().ReadUint32Le(ptr + 32); !ok_ {
 		return TimerFiredEvent{}, fmt.Errorf("wacogo/witgen: toGoMemTimerFiredEvent: field NextAttemptNumber: bad memory read")
 	} else {
 		v_.NextAttemptNumber = tmp_
@@ -7474,40 +7206,34 @@ func toGoMemTimerFiredEvent(ctx context.Context, cc *host.CallContext, h *host.C
 }
 
 func fromGoFlatTimerFiredEvent(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, stack []uint64, v TimerFiredEvent) error {
-	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.EventID); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[0:2], v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[2:4], v.ExecutionID); err_ != nil {
+	stack[2] = v.ExpectedRevision
+	if err_ := fromGoFlatString(ctx, cc, h, stack[3:5], v.TimerID); err_ != nil {
 		return err_
 	}
-	stack[4] = v.ExpectedRevision
-	if err_ := fromGoFlatString(ctx, cc, h, stack[5:7], v.TimerID); err_ != nil {
+	if err_ := fromGoFlatString(ctx, cc, h, stack[5:7], v.ActivationID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatString(ctx, cc, h, stack[7:9], v.ActivationID); err_ != nil {
-		return err_
-	}
-	stack[9] = uint64(v.NextAttemptNumber)
+	stack[7] = uint64(v.NextAttemptNumber)
 	return nil
 }
 
 func fromGoMemTimerFiredEvent(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, ptr uint32, v TimerFiredEvent) error {
-	if err_ := fromGoMemString(ctx, cc, h, ptr, v.EventID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr, v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+8, v.ExecutionID); err_ != nil {
-		return err_
-	}
-	if ok_ := cc.Memory().WriteUint64Le(ptr+16, v.ExpectedRevision); !ok_ {
+	if ok_ := cc.Memory().WriteUint64Le(ptr+8, v.ExpectedRevision); !ok_ {
 		return fmt.Errorf("wacogo/witgen: fromGoMemTimerFiredEvent: field ExpectedRevision: bad memory write")
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+24, v.TimerID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+16, v.TimerID); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemString(ctx, cc, h, ptr+32, v.ActivationID); err_ != nil {
+	if err_ := fromGoMemString(ctx, cc, h, ptr+24, v.ActivationID); err_ != nil {
 		return err_
 	}
-	if ok_ := cc.Memory().WriteUint32Le(ptr+40, v.NextAttemptNumber); !ok_ {
+	if ok_ := cc.Memory().WriteUint32Le(ptr+32, v.NextAttemptNumber); !ok_ {
 		return fmt.Errorf("wacogo/witgen: fromGoMemTimerFiredEvent: field NextAttemptNumber: bad memory write")
 	}
 	return nil
@@ -7520,25 +7246,20 @@ func liftFlatTimerFiredEvent(ctx context.Context, caller, callee *host.CallConte
 	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2]); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4]); err_ != nil {
-		return TimerFiredEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	v_.ExpectedRevision = stack[4]
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
+	v_.ExpectedRevision = stack[2]
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[2].Type, stack[3:5]); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
 		v_.TimerID = tmp_
 	}
-	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[4].Type, stack[7:9]); err_ != nil {
+	if tmp_, err_ := liftFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7]); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	v_.NextAttemptNumber = uint32(stack[9])
+	v_.NextAttemptNumber = uint32(stack[7])
 	return v_, nil
 }
 
@@ -7549,29 +7270,24 @@ func liftMemTimerFiredEvent(ctx context.Context, caller, callee *host.CallContex
 	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
-		v_.EventID = tmp_
-	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8); err_ != nil {
-		return TimerFiredEvent{}, err_
-	} else {
 		v_.ExecutionID = tmp_
 	}
-	if tmp_, ok_ := callee.Memory().ReadUint64Le(ptr + 16); !ok_ {
+	if tmp_, ok_ := callee.Memory().ReadUint64Le(ptr + 8); !ok_ {
 		return TimerFiredEvent{}, fmt.Errorf("wacogo/witgen: liftMemTimerFiredEvent: field ExpectedRevision: bad memory read")
 	} else {
 		v_.ExpectedRevision = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+16); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
 		v_.TimerID = tmp_
 	}
-	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[4].Type, ptr+32); err_ != nil {
+	if tmp_, err_ := liftMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24); err_ != nil {
 		return TimerFiredEvent{}, err_
 	} else {
 		v_.ActivationID = tmp_
 	}
-	if tmp_, ok_ := callee.Memory().ReadUint32Le(ptr + 40); !ok_ {
+	if tmp_, ok_ := callee.Memory().ReadUint32Le(ptr + 32); !ok_ {
 		return TimerFiredEvent{}, fmt.Errorf("wacogo/witgen: liftMemTimerFiredEvent: field NextAttemptNumber: bad memory read")
 	} else {
 		v_.NextAttemptNumber = tmp_
@@ -7582,42 +7298,36 @@ func liftMemTimerFiredEvent(ctx context.Context, caller, callee *host.CallContex
 func lowerFlatTimerFiredEvent(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64, v TimerFiredEvent) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.EventID); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:2], v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[1].Type, stack[2:4], v.ExecutionID); err_ != nil {
+	stack[2] = v.ExpectedRevision
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[2].Type, stack[3:5], v.TimerID); err_ != nil {
 		return err_
 	}
-	stack[4] = v.ExpectedRevision
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7], v.TimerID); err_ != nil {
+	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[3].Type, stack[5:7], v.ActivationID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatString(ctx, caller, callee, h, recT_.Fields[4].Type, stack[7:9], v.ActivationID); err_ != nil {
-		return err_
-	}
-	stack[9] = uint64(v.NextAttemptNumber)
+	stack[7] = uint64(v.NextAttemptNumber)
 	return nil
 }
 
 func lowerMemTimerFiredEvent(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, ptr uint32, v TimerFiredEvent) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.EventID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.ExecutionID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+8, v.ExecutionID); err_ != nil {
-		return err_
-	}
-	if ok_ := callee.Memory().WriteUint64Le(ptr+16, v.ExpectedRevision); !ok_ {
+	if ok_ := callee.Memory().WriteUint64Le(ptr+8, v.ExpectedRevision); !ok_ {
 		return fmt.Errorf("wacogo/witgen: lowerMemTimerFiredEvent: field ExpectedRevision: bad memory write")
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24, v.TimerID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[2].Type, ptr+16, v.TimerID); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[4].Type, ptr+32, v.ActivationID); err_ != nil {
+	if err_ := lowerMemString(ctx, caller, callee, h, recT_.Fields[3].Type, ptr+24, v.ActivationID); err_ != nil {
 		return err_
 	}
-	if ok_ := callee.Memory().WriteUint32Le(ptr+40, v.NextAttemptNumber); !ok_ {
+	if ok_ := callee.Memory().WriteUint32Le(ptr+32, v.NextAttemptNumber); !ok_ {
 		return fmt.Errorf("wacogo/witgen: lowerMemTimerFiredEvent: field NextAttemptNumber: bad memory write")
 	}
 	return nil
@@ -7627,12 +7337,12 @@ func toGoFlatTransitionResult(ctx context.Context, cc *host.CallContext, h *host
 	var v_ TransitionResult
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if tmp_, err_ := toGoFlatExecutionSnapshot(ctx, cc, h, recT_.Fields[0].Type, stack[0:39]); err_ != nil {
+	if tmp_, err_ := toGoFlatExecutionSnapshot(ctx, cc, h, recT_.Fields[0].Type, stack[0:37]); err_ != nil {
 		return TransitionResult{}, err_
 	} else {
 		v_.Snapshot = tmp_
 	}
-	if tmp_, err_ := toGoFlatListExecutionEffect(ctx, cc, h, recT_.Fields[1].Type, stack[39:41]); err_ != nil {
+	if tmp_, err_ := toGoFlatListExecutionEffect(ctx, cc, h, recT_.Fields[1].Type, stack[37:39]); err_ != nil {
 		return TransitionResult{}, err_
 	} else {
 		v_.Effects = tmp_
@@ -7649,7 +7359,7 @@ func toGoMemTransitionResult(ctx context.Context, cc *host.CallContext, h *host.
 	} else {
 		v_.Snapshot = tmp_
 	}
-	if tmp_, err_ := toGoMemListExecutionEffect(ctx, cc, h, recT_.Fields[1].Type, ptr+176); err_ != nil {
+	if tmp_, err_ := toGoMemListExecutionEffect(ctx, cc, h, recT_.Fields[1].Type, ptr+168); err_ != nil {
 		return TransitionResult{}, err_
 	} else {
 		v_.Effects = tmp_
@@ -7658,10 +7368,10 @@ func toGoMemTransitionResult(ctx context.Context, cc *host.CallContext, h *host.
 }
 
 func fromGoFlatTransitionResult(ctx context.Context, cc *host.CallContext, h *host.ComponentInstance, stack []uint64, v TransitionResult) error {
-	if err_ := fromGoFlatExecutionSnapshot(ctx, cc, h, stack[0:39], v.Snapshot); err_ != nil {
+	if err_ := fromGoFlatExecutionSnapshot(ctx, cc, h, stack[0:37], v.Snapshot); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoFlatListExecutionEffect(ctx, cc, h, stack[39:41], v.Effects); err_ != nil {
+	if err_ := fromGoFlatListExecutionEffect(ctx, cc, h, stack[37:39], v.Effects); err_ != nil {
 		return err_
 	}
 	return nil
@@ -7671,7 +7381,7 @@ func fromGoMemTransitionResult(ctx context.Context, cc *host.CallContext, h *hos
 	if err_ := fromGoMemExecutionSnapshot(ctx, cc, h, ptr, v.Snapshot); err_ != nil {
 		return err_
 	}
-	if err_ := fromGoMemListExecutionEffect(ctx, cc, h, ptr+176, v.Effects); err_ != nil {
+	if err_ := fromGoMemListExecutionEffect(ctx, cc, h, ptr+168, v.Effects); err_ != nil {
 		return err_
 	}
 	return nil
@@ -7681,12 +7391,12 @@ func liftFlatTransitionResult(ctx context.Context, caller, callee *host.CallCont
 	var v_ TransitionResult
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if tmp_, err_ := liftFlatExecutionSnapshot(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:39]); err_ != nil {
+	if tmp_, err_ := liftFlatExecutionSnapshot(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:37]); err_ != nil {
 		return TransitionResult{}, err_
 	} else {
 		v_.Snapshot = tmp_
 	}
-	if tmp_, err_ := liftFlatListExecutionEffect(ctx, caller, callee, h, recT_.Fields[1].Type, stack[39:41]); err_ != nil {
+	if tmp_, err_ := liftFlatListExecutionEffect(ctx, caller, callee, h, recT_.Fields[1].Type, stack[37:39]); err_ != nil {
 		return TransitionResult{}, err_
 	} else {
 		v_.Effects = tmp_
@@ -7703,7 +7413,7 @@ func liftMemTransitionResult(ctx context.Context, caller, callee *host.CallConte
 	} else {
 		v_.Snapshot = tmp_
 	}
-	if tmp_, err_ := liftMemListExecutionEffect(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+176); err_ != nil {
+	if tmp_, err_ := liftMemListExecutionEffect(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+168); err_ != nil {
 		return TransitionResult{}, err_
 	} else {
 		v_.Effects = tmp_
@@ -7714,10 +7424,10 @@ func liftMemTransitionResult(ctx context.Context, caller, callee *host.CallConte
 func lowerFlatTransitionResult(ctx context.Context, caller, callee *host.CallContext, h *host.ComponentInstance, ty wacogo.Type, stack []uint64, v TransitionResult) error {
 	recT_ := ty.(wacogo.TypeRecord)
 	_ = recT_
-	if err_ := lowerFlatExecutionSnapshot(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:39], v.Snapshot); err_ != nil {
+	if err_ := lowerFlatExecutionSnapshot(ctx, caller, callee, h, recT_.Fields[0].Type, stack[0:37], v.Snapshot); err_ != nil {
 		return err_
 	}
-	if err_ := lowerFlatListExecutionEffect(ctx, caller, callee, h, recT_.Fields[1].Type, stack[39:41], v.Effects); err_ != nil {
+	if err_ := lowerFlatListExecutionEffect(ctx, caller, callee, h, recT_.Fields[1].Type, stack[37:39], v.Effects); err_ != nil {
 		return err_
 	}
 	return nil
@@ -7729,7 +7439,7 @@ func lowerMemTransitionResult(ctx context.Context, caller, callee *host.CallCont
 	if err_ := lowerMemExecutionSnapshot(ctx, caller, callee, h, recT_.Fields[0].Type, ptr, v.Snapshot); err_ != nil {
 		return err_
 	}
-	if err_ := lowerMemListExecutionEffect(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+176, v.Effects); err_ != nil {
+	if err_ := lowerMemListExecutionEffect(ctx, caller, callee, h, recT_.Fields[1].Type, ptr+168, v.Effects); err_ != nil {
 		return err_
 	}
 	return nil
@@ -8072,7 +7782,7 @@ func wrapCompile(f *Factory) host.Func {
 		if implErr_ != nil {
 			return fmt.Errorf("wacogo/witgen: compile: impl returned error: %w", implErr_)
 		}
-		outPtr_, rerr_ := cc.Realloc(ctx, 0, 0, 4, 32)
+		outPtr_, rerr_ := cc.Realloc(ctx, 0, 0, 4, 28)
 		if rerr_ != nil {
 			return fmt.Errorf("wacogo/witgen: compile: realloc failed: %w", rerr_)
 		}
@@ -8091,7 +7801,7 @@ func wrapTransition(f *Factory) host.Func {
 		_ = fnType_
 		var plan ExecutableWorkflowPlan
 		{
-			v_, err_ := toGoFlatExecutableWorkflowPlan(ctx, cc, h, fnType_.Params[0].Type, stack[0:8])
+			v_, err_ := toGoFlatExecutableWorkflowPlan(ctx, cc, h, fnType_.Params[0].Type, stack[0:6])
 			if err_ != nil {
 				return err_
 			}
@@ -8099,7 +7809,7 @@ func wrapTransition(f *Factory) host.Func {
 		}
 		var snapshot OptionExecutionSnapshot
 		{
-			v_, err_ := toGoFlatOptionExecutionSnapshot(ctx, cc, h, fnType_.Params[1].Type, stack[8:48])
+			v_, err_ := toGoFlatOptionExecutionSnapshot(ctx, cc, h, fnType_.Params[1].Type, stack[6:44])
 			if err_ != nil {
 				return err_
 			}
@@ -8107,7 +7817,7 @@ func wrapTransition(f *Factory) host.Func {
 		}
 		var event ExecutionEvent
 		{
-			v_, err_ := toGoFlatExecutionEvent(ctx, cc, h, fnType_.Params[2].Type, stack[48:70])
+			v_, err_ := toGoFlatExecutionEvent(ctx, cc, h, fnType_.Params[2].Type, stack[44:64])
 			if err_ != nil {
 				return err_
 			}
@@ -8117,7 +7827,7 @@ func wrapTransition(f *Factory) host.Func {
 		if implErr_ != nil {
 			return fmt.Errorf("wacogo/witgen: transition: impl returned error: %w", implErr_)
 		}
-		outPtr_, rerr_ := cc.Realloc(ctx, 0, 0, 8, 192)
+		outPtr_, rerr_ := cc.Realloc(ctx, 0, 0, 8, 184)
 		if rerr_ != nil {
 			return fmt.Errorf("wacogo/witgen: transition: realloc failed: %w", rerr_)
 		}

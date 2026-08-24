@@ -254,7 +254,7 @@ func planToABI(value ExecutableWorkflowPlan) (abi.ExecutableWorkflowPlan, error)
 		}
 		nodes[index] = abi.PlanNode{ID: node.ID, Kind: kind, RetryPolicy: retryPolicy}
 	}
-	return abi.ExecutableWorkflowPlan{SpecificationVersion: abi.SpecificationVersion{Major: value.SpecificationVersion.Major, Minor: value.SpecificationVersion.Minor}, WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint, Nodes: nodes}, nil
+	return abi.ExecutableWorkflowPlan{WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint, Nodes: nodes}, nil
 }
 
 func planFromABI(value abi.ExecutableWorkflowPlan) (ExecutableWorkflowPlan, error) {
@@ -274,7 +274,7 @@ func planFromABI(value abi.ExecutableWorkflowPlan) (ExecutableWorkflowPlan, erro
 		}
 		nodes[index] = PlanNode{ID: node.ID, Kind: kind, RetryPolicy: retryPolicy}
 	}
-	return ExecutableWorkflowPlan{SpecificationVersion: SpecificationVersion{Major: value.SpecificationVersion.Major, Minor: value.SpecificationVersion.Minor}, WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint, Nodes: nodes}, nil
+	return ExecutableWorkflowPlan{WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint, Nodes: nodes}, nil
 }
 
 func payloadToABI(value Payload) (abi.Payload, error) {
@@ -396,23 +396,13 @@ func planReferenceToABI(value PlanReference) (abi.PlanReference, error) {
 		return abi.PlanReference{}, err
 	}
 	return abi.PlanReference{
-		SpecificationVersion: abi.SpecificationVersion{
-			Major: value.SpecificationVersion.Major,
-			Minor: value.SpecificationVersion.Minor,
-		},
-		WorkflowID:  value.WorkflowID,
-		Fingerprint: value.Fingerprint,
+		WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint,
 	}, nil
 }
 
 func planReferenceFromABI(value abi.PlanReference) PlanReference {
 	return PlanReference{
-		SpecificationVersion: SpecificationVersion{
-			Major: value.SpecificationVersion.Major,
-			Minor: value.SpecificationVersion.Minor,
-		},
-		WorkflowID:  value.WorkflowID,
-		Fingerprint: value.Fingerprint,
+		WorkflowID: value.WorkflowID, Fingerprint: value.Fingerprint,
 	}
 }
 
@@ -521,9 +511,6 @@ func snapshotFromABI(value abi.ExecutionSnapshot) (ExecutionSnapshot, error) {
 func eventToABI(value ExecutionEvent) (abi.ExecutionEvent, error) {
 	switch event := value.(type) {
 	case ExecutionStarted:
-		if err := validateIdentifier("execution-started event id", event.EventID); err != nil {
-			return nil, err
-		}
 		if err := validateIdentifier("execution-started execution id", event.ExecutionID); err != nil {
 			return nil, err
 		}
@@ -536,7 +523,6 @@ func eventToABI(value ExecutionEvent) (abi.ExecutionEvent, error) {
 			return nil, fmt.Errorf("convert execution-started input: %w", err)
 		}
 		return abi.ExecutionEventExecutionStarted{Value: abi.ExecutionStartedEvent{
-			EventID:       event.EventID,
 			ExecutionID:   event.ExecutionID,
 			PlanReference: planReference,
 			Input:         input,
@@ -546,7 +532,6 @@ func eventToABI(value ExecutionEvent) (abi.ExecutionEvent, error) {
 			field string
 			value string
 		}{
-			{field: "node-attempt-succeeded event id", value: event.EventID},
 			{field: "node-attempt-succeeded execution id", value: event.ExecutionID},
 			{field: "node-attempt-succeeded activation id", value: event.ActivationID},
 			{field: "node-attempt-succeeded attempt id", value: event.AttemptID},
@@ -566,13 +551,12 @@ func eventToABI(value ExecutionEvent) (abi.ExecutionEvent, error) {
 			return nil, fmt.Errorf("convert node-attempt-succeeded output: %w", err)
 		}
 		return abi.ExecutionEventNodeAttemptSucceeded{Value: abi.NodeAttemptSucceededEvent{
-			EventID: event.EventID, ExecutionID: event.ExecutionID, ExpectedRevision: event.ExpectedRevision,
+			ExecutionID: event.ExecutionID, ExpectedRevision: event.ExpectedRevision,
 			ActivationID: event.ActivationID, AttemptID: event.AttemptID, AttemptNumber: event.AttemptNumber,
 			EffectID: event.EffectID, NodeID: event.NodeID, Output: output,
 		}}, nil
 	case NodeAttemptFailed:
 		identifiers := []struct{ field, value string }{
-			{field: "node-attempt-failed event id", value: event.EventID},
 			{field: "node-attempt-failed execution id", value: event.ExecutionID},
 			{field: "node-attempt-failed activation id", value: event.ActivationID},
 			{field: "node-attempt-failed attempt id", value: event.AttemptID},
@@ -592,13 +576,12 @@ func eventToABI(value ExecutionEvent) (abi.ExecutionEvent, error) {
 			return nil, fmt.Errorf("convert node-attempt-failed failure: %w", err)
 		}
 		return abi.ExecutionEventNodeAttemptFailed{Value: abi.NodeAttemptFailedEvent{
-			EventID: event.EventID, ExecutionID: event.ExecutionID, ExpectedRevision: event.ExpectedRevision,
+			ExecutionID: event.ExecutionID, ExpectedRevision: event.ExpectedRevision,
 			ActivationID: event.ActivationID, AttemptID: event.AttemptID, AttemptNumber: event.AttemptNumber,
 			EffectID: event.EffectID, NodeID: event.NodeID, Failure: failure,
 		}}, nil
 	case TimerFired:
 		identifiers := []struct{ field, value string }{
-			{field: "timer-fired event id", value: event.EventID},
 			{field: "timer-fired execution id", value: event.ExecutionID},
 			{field: "timer-fired timer id", value: event.TimerID},
 			{field: "timer-fired activation id", value: event.ActivationID},
@@ -612,7 +595,7 @@ func eventToABI(value ExecutionEvent) (abi.ExecutionEvent, error) {
 			return nil, fmt.Errorf("timer-fired next attempt number must be non-zero")
 		}
 		return abi.ExecutionEventTimerFired{Value: abi.TimerFiredEvent{
-			EventID: event.EventID, ExecutionID: event.ExecutionID,
+			ExecutionID:      event.ExecutionID,
 			ExpectedRevision: event.ExpectedRevision, TimerID: event.TimerID,
 			ActivationID: event.ActivationID, NextAttemptNumber: event.NextAttemptNumber,
 		}}, nil

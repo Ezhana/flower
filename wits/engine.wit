@@ -1,7 +1,6 @@
-package flower:engine@0.2.0;
+package flower:engine@0.1.0;
 
 interface workflow-engine {
-    record specification-version { major: u16, minor: u16 }
     enum node-kind { start, activity, finish }
     record fixed-backoff { delay-ms: u64 }
     record exponential-backoff {
@@ -26,13 +25,11 @@ interface workflow-engine {
 
     record plan-node { id: string, kind: node-kind, retry-policy: option<retry-policy> }
     record executable-workflow-plan {
-        specification-version: specification-version,
         workflow-id: string,
         fingerprint: string,
         nodes: list<plan-node>,
     }
     record plan-reference {
-        specification-version: specification-version,
         workflow-id: string,
         fingerprint: string,
     }
@@ -79,13 +76,11 @@ interface workflow-engine {
     }
 
     record execution-started-event {
-        event-id: string,
         execution-id: string,
         plan-reference: plan-reference,
         input: payload,
     }
     record node-attempt-succeeded-event {
-        event-id: string,
         execution-id: string,
         expected-revision: u64,
         activation-id: string,
@@ -96,7 +91,6 @@ interface workflow-engine {
         output: payload,
     }
     record node-attempt-failed-event {
-        event-id: string,
         execution-id: string,
         expected-revision: u64,
         activation-id: string,
@@ -107,7 +101,6 @@ interface workflow-engine {
         failure: attempt-failure,
     }
     record timer-fired-event {
-        event-id: string,
         execution-id: string,
         expected-revision: u64,
         timer-id: string,

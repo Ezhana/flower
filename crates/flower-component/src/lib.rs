@@ -1,19 +1,14 @@
-use flower_compiler::{
-    Diagnostic as DomainDiagnostic, EdgeDefinition as DomainEdge, NodeDefinition as DomainNode,
-    WorkflowDefinition as DomainDefinition, compile,
-};
-use flower_kernel::{
-    AttemptFailure as DomainFailure, AttemptNumber as DomainAttemptNumber,
-    ExecutionEffect as DomainEffect, ExecutionEvent as DomainEvent, ExecutionRevision,
-    ExecutionSnapshot as DomainSnapshot, ExecutionState as DomainState,
-    NodeActivation as DomainActivation, NodeAttempt as DomainAttempt, Payload as DomainPayload,
-    RetryTimer as DomainRetryTimer, Transition as DomainTransition, transition,
-};
-use flower_plan::{
-    AttemptId, BackoffPolicy as DomainBackoff, EdgeId, EffectId, EventId,
-    ExecutableWorkflowPlan as DomainPlan, ExecutionId, FailureCode, NodeActivationId, NodeId,
-    NodeKind as DomainNodeKind, PlanFingerprint, PlanReference as DomainPlanReference,
-    RetryPolicy as DomainRetryPolicy, SpecificationVersion as DomainVersion, TimerId, WorkflowId,
+use flower_engine::{
+    AttemptFailure as DomainFailure, AttemptId, AttemptNumber as DomainAttemptNumber,
+    BackoffPolicy as DomainBackoff, Diagnostic as DomainDiagnostic, EdgeDefinition as DomainEdge,
+    EdgeId, EffectId, ExecutableWorkflowPlan as DomainPlan, ExecutionEffect as DomainEffect,
+    ExecutionEvent as DomainEvent, ExecutionId, ExecutionRevision,
+    ExecutionSnapshot as DomainSnapshot, ExecutionState as DomainState, FailureCode,
+    NodeActivation as DomainActivation, NodeActivationId, NodeAttempt as DomainAttempt,
+    NodeDefinition as DomainNode, NodeId, NodeKind as DomainNodeKind, Payload as DomainPayload,
+    PlanFingerprint, PlanReference as DomainPlanReference, RetryPolicy as DomainRetryPolicy,
+    RetryTimer as DomainRetryTimer, TimerId, Transition as DomainTransition,
+    WorkflowDefinition as DomainDefinition, WorkflowId, compile, transition,
 };
 
 wit_bindgen::generate!({ path: "../../wits/engine.wit", world: "engine" });
@@ -24,8 +19,8 @@ use exports::flower::engine::workflow_engine::{
     ExecutionSnapshot, ExecutionStartedEvent, ExecutionState, ExponentialBackoff, FailedExecution,
     FixedBackoff, Guest, NodeActivation, NodeAttempt, NodeAttemptFailedEvent,
     NodeAttemptSucceededEvent, NodeDefinition, NodeKind, Payload, PlanNode, PlanReference,
-    RetryPolicy, RetryTimer, ScheduleTimerEffect, SpecificationVersion, TimerFiredEvent,
-    TransitionResult, WaitingForRetry, WorkflowDefinition,
+    RetryPolicy, RetryTimer, ScheduleTimerEffect, TimerFiredEvent, TransitionResult,
+    WaitingForRetry, WorkflowDefinition,
 };
 
 struct FlowerWorkflowEngine;
@@ -208,7 +203,6 @@ impl BackoffPolicy {
 impl ExecutableWorkflowPlan {
     fn from_domain(plan: DomainPlan) -> Self {
         Self {
-            specification_version: SpecificationVersion::from_domain(plan.specification_version()),
             workflow_id: plan.workflow_id().to_string(),
             fingerprint: plan.fingerprint().to_string(),
             nodes: plan
@@ -224,12 +218,6 @@ impl ExecutableWorkflowPlan {
     }
 
     fn try_into_domain(self) -> Result<DomainPlan, EngineError> {
-        if self.specification_version.try_into_domain()? != DomainVersion::V0_2 {
-            return Err(engine_error(
-                "unsupported-specification-version",
-                "unsupported plan specification version",
-            ));
-        }
         let supplied_fingerprint = PlanFingerprint::from_sha256(self.fingerprint)
             .map_err(|error| engine_error("invalid-plan-fingerprint", error))?;
         let workflow_id = WorkflowId::new(self.workflow_id)
@@ -293,20 +281,6 @@ impl Diagnostic {
         }
     }
 }
-impl SpecificationVersion {
-    fn from_domain(value: DomainVersion) -> Self {
-        Self {
-            major: value.major,
-            minor: value.minor,
-        }
-    }
-    fn try_into_domain(self) -> Result<DomainVersion, EngineError> {
-        Ok(DomainVersion {
-            major: self.major,
-            minor: self.minor,
-        })
-    }
-}
 impl Payload {
     fn from_domain(value: DomainPayload) -> Self {
         Self {
@@ -345,7 +319,6 @@ impl ExecutionSnapshot {
 impl PlanReference {
     fn try_into_domain(self) -> Result<DomainPlanReference, EngineError> {
         Ok(DomainPlanReference {
-            specification_version: self.specification_version.try_into_domain()?,
             workflow_id: WorkflowId::new(self.workflow_id)
                 .map_err(|error| engine_error("invalid-workflow-id", error))?,
             fingerprint: PlanFingerprint::from_sha256(self.fingerprint)
@@ -355,7 +328,6 @@ impl PlanReference {
 
     fn from_domain(value: DomainPlanReference) -> Self {
         Self {
-            specification_version: SpecificationVersion::from_domain(value.specification_version),
             workflow_id: value.workflow_id.to_string(),
             fingerprint: value.fingerprint.to_string(),
         }
@@ -504,20 +476,16 @@ impl ExecutionEvent {
     fn try_into_domain(self) -> Result<DomainEvent, EngineError> {
         match self {
             Self::ExecutionStarted(ExecutionStartedEvent {
-                event_id,
                 execution_id,
                 plan_reference,
                 input,
             }) => Ok(DomainEvent::ExecutionStarted {
-                event_id: EventId::new(event_id)
-                    .map_err(|error| engine_error("invalid-event-id", error))?,
                 execution_id: ExecutionId::new(execution_id)
                     .map_err(|error| engine_error("invalid-execution-id", error))?,
                 plan_reference: plan_reference.try_into_domain()?,
                 input: input.into_domain(),
             }),
             Self::NodeAttemptSucceeded(NodeAttemptSucceededEvent {
-                event_id,
                 execution_id,
                 expected_revision,
                 activation_id,
@@ -527,8 +495,6 @@ impl ExecutionEvent {
                 node_id,
                 output,
             }) => Ok(DomainEvent::NodeAttemptSucceeded {
-                event_id: EventId::new(event_id)
-                    .map_err(|error| engine_error("invalid-event-id", error))?,
                 execution_id: ExecutionId::new(execution_id)
                     .map_err(|error| engine_error("invalid-execution-id", error))?,
                 expected_revision: ExecutionRevision(expected_revision),
@@ -544,7 +510,6 @@ impl ExecutionEvent {
                 output: output.into_domain(),
             }),
             Self::NodeAttemptFailed(NodeAttemptFailedEvent {
-                event_id,
                 execution_id,
                 expected_revision,
                 activation_id,
@@ -554,8 +519,6 @@ impl ExecutionEvent {
                 node_id,
                 failure,
             }) => Ok(DomainEvent::NodeAttemptFailed {
-                event_id: EventId::new(event_id)
-                    .map_err(|error| engine_error("invalid-event-id", error))?,
                 execution_id: ExecutionId::new(execution_id)
                     .map_err(|error| engine_error("invalid-execution-id", error))?,
                 expected_revision: ExecutionRevision(expected_revision),
@@ -571,15 +534,12 @@ impl ExecutionEvent {
                 failure: failure.try_into_domain()?,
             }),
             Self::TimerFired(TimerFiredEvent {
-                event_id,
                 execution_id,
                 expected_revision,
                 timer_id,
                 activation_id,
                 next_attempt_number,
             }) => Ok(DomainEvent::TimerFired {
-                event_id: EventId::new(event_id)
-                    .map_err(|error| engine_error("invalid-event-id", error))?,
                 execution_id: ExecutionId::new(execution_id)
                     .map_err(|error| engine_error("invalid-execution-id", error))?,
                 expected_revision: ExecutionRevision(expected_revision),

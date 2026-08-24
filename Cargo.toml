@@ -1,9 +1,14 @@
 [workspace]
-members = ["crates/*"]
+members = [
+    "crates/flower-component",
+    "crates/flower-component-tools",
+    "crates/flower-engine",
+    "crates/flower-engine-tests",
+]
 resolver = "3"
 
 [workspace.package]
-version = "0.2.0"
+version = "0.1.0"
 edition = "2024"
 license = "MIT"
 
@@ -11,12 +16,8 @@ license = "MIT"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-yaml_serde = "0.10"
-clap = { version = "4", features = ["derive"] }
 anyhow = "1"
 wit-bindgen = "0.47"
 sha2 = "0.10"
 wasmparser = "0.240"
 wit-component = "0.240"
-tokio = { version = "1", features = ["sync"] }
-tokio-postgres = { version = "0.7", features = ["with-serde_json-1"] }

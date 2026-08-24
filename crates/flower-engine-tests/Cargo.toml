@@ -1,12 +1,11 @@
 [package]
-name = "flower-component"
+name = "flower-engine-tests"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-
-[lib]
-crate-type = ["cdylib"]
+publish = false
 
 [dependencies]
 flower-engine = { path = "../flower-engine" }
-wit-bindgen.workspace = true
+serde.workspace = true
+serde_json.workspace = true

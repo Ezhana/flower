@@ -73,7 +73,6 @@ type ExecutionSnapshot struct {
 type ExecutionEvent interface{ executionEvent() }
 
 type ExecutionStarted struct {
-	EventID       string        `json:"event_id"`
 	ExecutionID   string        `json:"execution_id"`
 	PlanReference PlanReference `json:"plan_reference"`
 	Input         Payload       `json:"input"`
@@ -82,7 +81,6 @@ type ExecutionStarted struct {
 func (ExecutionStarted) executionEvent() {}
 
 type NodeAttemptSucceeded struct {
-	EventID          string  `json:"event_id"`
 	ExecutionID      string  `json:"execution_id"`
 	ExpectedRevision uint64  `json:"expected_revision"`
 	ActivationID     string  `json:"activation_id"`
@@ -96,7 +94,6 @@ type NodeAttemptSucceeded struct {
 func (NodeAttemptSucceeded) executionEvent() {}
 
 type NodeAttemptFailed struct {
-	EventID          string         `json:"event_id"`
 	ExecutionID      string         `json:"execution_id"`
 	ExpectedRevision uint64         `json:"expected_revision"`
 	ActivationID     string         `json:"activation_id"`
@@ -110,7 +107,6 @@ type NodeAttemptFailed struct {
 func (NodeAttemptFailed) executionEvent() {}
 
 type TimerFired struct {
-	EventID           string `json:"event_id"`
 	ExecutionID       string `json:"execution_id"`
 	ExpectedRevision  uint64 `json:"expected_revision"`
 	TimerID           string `json:"timer_id"`

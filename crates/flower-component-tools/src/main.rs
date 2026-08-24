@@ -1,4 +1,4 @@
-use std::{env, fs};
+use std::{env, fs, path::Path};
 
 use anyhow::{Context, Result, bail};
 use wasmparser::{Encoding, Parser, Payload, Validator, WasmFeatures};
@@ -21,6 +21,10 @@ fn component_new(input: &str, output: &str) -> Result<()> {
         .context("embed component type metadata")?
         .encode()
         .context("encode component")?;
+    if let Some(parent) = Path::new(output).parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("create component output directory {}", parent.display()))?;
+    }
     fs::write(output, component).with_context(|| format!("write component {output}"))
 }
 
