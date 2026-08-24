@@ -1,0 +1,1329 @@
+{
+  "schema_version": "flower.engine-fixture/v1",
+  "name": "retry-lifecycle",
+  "definition": {
+    "id": "retry-lifecycle",
+    "nodes": [
+      {
+        "id": "start",
+        "kind": "start",
+        "retry_policy": null
+      },
+      {
+        "id": "work",
+        "kind": "activity",
+        "retry_policy": {
+          "max_attempts": 3,
+          "retryable_failure_codes": [
+            "worker.transient"
+          ],
+          "backoff": {
+            "type": "exponential",
+            "initial_delay_ms": 10,
+            "multiplier": 3,
+            "maximum_delay_ms": 25
+          }
+        }
+      },
+      {
+        "id": "finish",
+        "kind": "finish",
+        "retry_policy": null
+      }
+    ],
+    "edges": [
+      {
+        "id": "start-work",
+        "source": "start",
+        "target": "work"
+      },
+      {
+        "id": "work-finish",
+        "source": "work",
+        "target": "finish"
+      }
+    ]
+  },
+  "expected_compile": {
+    "outcome": "plan",
+    "plan": {
+      "workflow_id": "retry-lifecycle",
+      "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b",
+      "nodes": [
+        {
+          "id": "start",
+          "kind": "start",
+          "retry_policy": null
+        },
+        {
+          "id": "work",
+          "kind": "activity",
+          "retry_policy": {
+            "max_attempts": 3,
+            "retryable_failure_codes": [
+              "worker.transient"
+            ],
+            "backoff": {
+              "type": "exponential",
+              "initial_delay_ms": 10,
+              "multiplier": 3,
+              "maximum_delay_ms": 25
+            }
+          }
+        },
+        {
+          "id": "finish",
+          "kind": "finish",
+          "retry_policy": null
+        }
+      ]
+    }
+  },
+  "steps": [
+    {
+      "snapshot": null,
+      "event": {
+        "type": "execution-started",
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "input": {
+          "media_type": "text/plain",
+          "bytes": [
+            105,
+            110,
+            112,
+            117,
+            116
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "execution-retry",
+          "plan_reference": {
+            "workflow_id": "retry-lifecycle",
+            "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+          },
+          "revision": 1,
+          "state": {
+            "type": "awaiting-attempt",
+            "activation": {
+              "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+              "activation_revision": 1,
+              "node_id": "work",
+              "input": {
+                "media_type": "text/plain",
+                "bytes": [
+                  105,
+                  110,
+                  112,
+                  117,
+                  116
+                ]
+              }
+            },
+            "attempt": {
+              "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+              "attempt_number": 1,
+              "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+            }
+          }
+        },
+        "effects": [
+          {
+            "type": "execute-node-attempt",
+            "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4",
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "attempt_number": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "attempt_number": 1,
+            "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-failed",
+        "execution_id": "execution-retry",
+        "expected_revision": 1,
+        "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+        "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+        "attempt_number": 1,
+        "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4",
+        "node_id": "work",
+        "failure": {
+          "code": "worker.transient",
+          "details": {
+            "media_type": "text/plain",
+            "bytes": [
+              102,
+              97,
+              105,
+              108,
+              117,
+              114,
+              101,
+              45,
+              100,
+              101,
+              116,
+              97,
+              105,
+              108,
+              115
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "execution-retry",
+          "plan_reference": {
+            "workflow_id": "retry-lifecycle",
+            "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+          },
+          "revision": 2,
+          "state": {
+            "type": "waiting-for-retry",
+            "activation": {
+              "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+              "activation_revision": 1,
+              "node_id": "work",
+              "input": {
+                "media_type": "text/plain",
+                "bytes": [
+                  105,
+                  110,
+                  112,
+                  117,
+                  116
+                ]
+              }
+            },
+            "attempt": {
+              "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+              "attempt_number": 1,
+              "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+            },
+            "failure": {
+              "code": "worker.transient",
+              "details": {
+                "media_type": "text/plain",
+                "bytes": [
+                  102,
+                  97,
+                  105,
+                  108,
+                  117,
+                  114,
+                  101,
+                  45,
+                  100,
+                  101,
+                  116,
+                  97,
+                  105,
+                  108,
+                  115
+                ]
+              }
+            },
+            "timer": {
+              "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+              "effect_id": "effect-2dcf79547b357b41ddf9d9219416d132438b948537e70a286daccf9b29d33b83",
+              "failed_attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+              "next_attempt_number": 2,
+              "delay_ms": 10
+            }
+          }
+        },
+        "effects": [
+          {
+            "type": "schedule-timer",
+            "effect_id": "effect-2dcf79547b357b41ddf9d9219416d132438b948537e70a286daccf9b29d33b83",
+            "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "failed_attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "next_attempt_number": 2,
+            "delay_ms": 10
+          }
+        ]
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 2,
+        "state": {
+          "type": "waiting-for-retry",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "attempt_number": 1,
+            "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+          },
+          "failure": {
+            "code": "worker.transient",
+            "details": {
+              "media_type": "text/plain",
+              "bytes": [
+                102,
+                97,
+                105,
+                108,
+                117,
+                114,
+                101,
+                45,
+                100,
+                101,
+                116,
+                97,
+                105,
+                108,
+                115
+              ]
+            }
+          },
+          "timer": {
+            "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+            "effect_id": "effect-2dcf79547b357b41ddf9d9219416d132438b948537e70a286daccf9b29d33b83",
+            "failed_attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "next_attempt_number": 2,
+            "delay_ms": 10
+          }
+        }
+      },
+      "event": {
+        "type": "timer-fired",
+        "execution_id": "execution-retry",
+        "expected_revision": 2,
+        "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+        "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+        "next_attempt_number": 2
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "execution-retry",
+          "plan_reference": {
+            "workflow_id": "retry-lifecycle",
+            "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+          },
+          "revision": 3,
+          "state": {
+            "type": "awaiting-attempt",
+            "activation": {
+              "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+              "activation_revision": 1,
+              "node_id": "work",
+              "input": {
+                "media_type": "text/plain",
+                "bytes": [
+                  105,
+                  110,
+                  112,
+                  117,
+                  116
+                ]
+              }
+            },
+            "attempt": {
+              "attempt_id": "attempt-3addc2124a00f4dc2f46913c528b28eac4dc53449e5b95a69fc68197c52dbf3a",
+              "attempt_number": 2,
+              "effect_id": "effect-c9b8fa2d4cc56c26f306d88714fda558dd6f279a71e3bd7cc0f56c55e718c182"
+            }
+          }
+        },
+        "effects": [
+          {
+            "type": "execute-node-attempt",
+            "effect_id": "effect-c9b8fa2d4cc56c26f306d88714fda558dd6f279a71e3bd7cc0f56c55e718c182",
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "attempt_id": "attempt-3addc2124a00f4dc2f46913c528b28eac4dc53449e5b95a69fc68197c52dbf3a",
+            "attempt_number": 2,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 3,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-3addc2124a00f4dc2f46913c528b28eac4dc53449e5b95a69fc68197c52dbf3a",
+            "attempt_number": 2,
+            "effect_id": "effect-c9b8fa2d4cc56c26f306d88714fda558dd6f279a71e3bd7cc0f56c55e718c182"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-failed",
+        "execution_id": "execution-retry",
+        "expected_revision": 3,
+        "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+        "attempt_id": "attempt-3addc2124a00f4dc2f46913c528b28eac4dc53449e5b95a69fc68197c52dbf3a",
+        "attempt_number": 2,
+        "effect_id": "effect-c9b8fa2d4cc56c26f306d88714fda558dd6f279a71e3bd7cc0f56c55e718c182",
+        "node_id": "work",
+        "failure": {
+          "code": "worker.transient",
+          "details": {
+            "media_type": "text/plain",
+            "bytes": [
+              102,
+              97,
+              105,
+              108,
+              117,
+              114,
+              101,
+              45,
+              100,
+              101,
+              116,
+              97,
+              105,
+              108,
+              115
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "execution-retry",
+          "plan_reference": {
+            "workflow_id": "retry-lifecycle",
+            "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+          },
+          "revision": 4,
+          "state": {
+            "type": "waiting-for-retry",
+            "activation": {
+              "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+              "activation_revision": 1,
+              "node_id": "work",
+              "input": {
+                "media_type": "text/plain",
+                "bytes": [
+                  105,
+                  110,
+                  112,
+                  117,
+                  116
+                ]
+              }
+            },
+            "attempt": {
+              "attempt_id": "attempt-3addc2124a00f4dc2f46913c528b28eac4dc53449e5b95a69fc68197c52dbf3a",
+              "attempt_number": 2,
+              "effect_id": "effect-c9b8fa2d4cc56c26f306d88714fda558dd6f279a71e3bd7cc0f56c55e718c182"
+            },
+            "failure": {
+              "code": "worker.transient",
+              "details": {
+                "media_type": "text/plain",
+                "bytes": [
+                  102,
+                  97,
+                  105,
+                  108,
+                  117,
+                  114,
+                  101,
+                  45,
+                  100,
+                  101,
+                  116,
+                  97,
+                  105,
+                  108,
+                  115
+                ]
+              }
+            },
+            "timer": {
+              "timer_id": "timer-e3ffbf93c6730b0cd1ac022a1f12aa3fd95ca4b96de8966fa1d3b04d42cd8947",
+              "effect_id": "effect-6d8743724243a2027375074a57ff273716968b26ff02bc7f95682adbad5d48e9",
+              "failed_attempt_id": "attempt-3addc2124a00f4dc2f46913c528b28eac4dc53449e5b95a69fc68197c52dbf3a",
+              "next_attempt_number": 3,
+              "delay_ms": 25
+            }
+          }
+        },
+        "effects": [
+          {
+            "type": "schedule-timer",
+            "effect_id": "effect-6d8743724243a2027375074a57ff273716968b26ff02bc7f95682adbad5d48e9",
+            "timer_id": "timer-e3ffbf93c6730b0cd1ac022a1f12aa3fd95ca4b96de8966fa1d3b04d42cd8947",
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "failed_attempt_id": "attempt-3addc2124a00f4dc2f46913c528b28eac4dc53449e5b95a69fc68197c52dbf3a",
+            "next_attempt_number": 3,
+            "delay_ms": 25
+          }
+        ]
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 4,
+        "state": {
+          "type": "waiting-for-retry",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-3addc2124a00f4dc2f46913c528b28eac4dc53449e5b95a69fc68197c52dbf3a",
+            "attempt_number": 2,
+            "effect_id": "effect-c9b8fa2d4cc56c26f306d88714fda558dd6f279a71e3bd7cc0f56c55e718c182"
+          },
+          "failure": {
+            "code": "worker.transient",
+            "details": {
+              "media_type": "text/plain",
+              "bytes": [
+                102,
+                97,
+                105,
+                108,
+                117,
+                114,
+                101,
+                45,
+                100,
+                101,
+                116,
+                97,
+                105,
+                108,
+                115
+              ]
+            }
+          },
+          "timer": {
+            "timer_id": "timer-e3ffbf93c6730b0cd1ac022a1f12aa3fd95ca4b96de8966fa1d3b04d42cd8947",
+            "effect_id": "effect-6d8743724243a2027375074a57ff273716968b26ff02bc7f95682adbad5d48e9",
+            "failed_attempt_id": "attempt-3addc2124a00f4dc2f46913c528b28eac4dc53449e5b95a69fc68197c52dbf3a",
+            "next_attempt_number": 3,
+            "delay_ms": 25
+          }
+        }
+      },
+      "event": {
+        "type": "timer-fired",
+        "execution_id": "execution-retry",
+        "expected_revision": 4,
+        "timer_id": "timer-e3ffbf93c6730b0cd1ac022a1f12aa3fd95ca4b96de8966fa1d3b04d42cd8947",
+        "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+        "next_attempt_number": 3
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "execution-retry",
+          "plan_reference": {
+            "workflow_id": "retry-lifecycle",
+            "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+          },
+          "revision": 5,
+          "state": {
+            "type": "awaiting-attempt",
+            "activation": {
+              "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+              "activation_revision": 1,
+              "node_id": "work",
+              "input": {
+                "media_type": "text/plain",
+                "bytes": [
+                  105,
+                  110,
+                  112,
+                  117,
+                  116
+                ]
+              }
+            },
+            "attempt": {
+              "attempt_id": "attempt-b4188c3b8c80d1ea4f33df8e0320712f6e09ba9a4ef8ffb806187e4b18c0097a",
+              "attempt_number": 3,
+              "effect_id": "effect-25ea3fd559e21ab84ecca335a8f5b48ff555c0a6c85d41f9c679748e9c32612d"
+            }
+          }
+        },
+        "effects": [
+          {
+            "type": "execute-node-attempt",
+            "effect_id": "effect-25ea3fd559e21ab84ecca335a8f5b48ff555c0a6c85d41f9c679748e9c32612d",
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "attempt_id": "attempt-b4188c3b8c80d1ea4f33df8e0320712f6e09ba9a4ef8ffb806187e4b18c0097a",
+            "attempt_number": 3,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 5,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-b4188c3b8c80d1ea4f33df8e0320712f6e09ba9a4ef8ffb806187e4b18c0097a",
+            "attempt_number": 3,
+            "effect_id": "effect-25ea3fd559e21ab84ecca335a8f5b48ff555c0a6c85d41f9c679748e9c32612d"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-failed",
+        "execution_id": "execution-retry",
+        "expected_revision": 5,
+        "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+        "attempt_id": "attempt-b4188c3b8c80d1ea4f33df8e0320712f6e09ba9a4ef8ffb806187e4b18c0097a",
+        "attempt_number": 3,
+        "effect_id": "effect-25ea3fd559e21ab84ecca335a8f5b48ff555c0a6c85d41f9c679748e9c32612d",
+        "node_id": "work",
+        "failure": {
+          "code": "worker.transient",
+          "details": {
+            "media_type": "text/plain",
+            "bytes": [
+              102,
+              97,
+              105,
+              108,
+              117,
+              114,
+              101,
+              45,
+              100,
+              101,
+              116,
+              97,
+              105,
+              108,
+              115
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "execution-retry",
+          "plan_reference": {
+            "workflow_id": "retry-lifecycle",
+            "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+          },
+          "revision": 6,
+          "state": {
+            "type": "failed",
+            "activation": {
+              "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+              "activation_revision": 1,
+              "node_id": "work",
+              "input": {
+                "media_type": "text/plain",
+                "bytes": [
+                  105,
+                  110,
+                  112,
+                  117,
+                  116
+                ]
+              }
+            },
+            "attempt": {
+              "attempt_id": "attempt-b4188c3b8c80d1ea4f33df8e0320712f6e09ba9a4ef8ffb806187e4b18c0097a",
+              "attempt_number": 3,
+              "effect_id": "effect-25ea3fd559e21ab84ecca335a8f5b48ff555c0a6c85d41f9c679748e9c32612d"
+            },
+            "failure": {
+              "code": "worker.transient",
+              "details": {
+                "media_type": "text/plain",
+                "bytes": [
+                  102,
+                  97,
+                  105,
+                  108,
+                  117,
+                  114,
+                  101,
+                  45,
+                  100,
+                  101,
+                  116,
+                  97,
+                  105,
+                  108,
+                  115
+                ]
+              }
+            }
+          }
+        },
+        "effects": []
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 1,
+        "state": {
+          "type": "awaiting-attempt",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "attempt_number": 1,
+            "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+          }
+        }
+      },
+      "event": {
+        "type": "node-attempt-failed",
+        "execution_id": "execution-retry",
+        "expected_revision": 1,
+        "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+        "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+        "attempt_number": 1,
+        "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4",
+        "node_id": "work",
+        "failure": {
+          "code": "worker.permanent",
+          "details": {
+            "media_type": "text/plain",
+            "bytes": [
+              102,
+              97,
+              105,
+              108,
+              117,
+              114,
+              101,
+              45,
+              100,
+              101,
+              116,
+              97,
+              105,
+              108,
+              115
+            ]
+          }
+        }
+      },
+      "expected": {
+        "outcome": "transition",
+        "snapshot": {
+          "execution_id": "execution-retry",
+          "plan_reference": {
+            "workflow_id": "retry-lifecycle",
+            "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+          },
+          "revision": 2,
+          "state": {
+            "type": "failed",
+            "activation": {
+              "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+              "activation_revision": 1,
+              "node_id": "work",
+              "input": {
+                "media_type": "text/plain",
+                "bytes": [
+                  105,
+                  110,
+                  112,
+                  117,
+                  116
+                ]
+              }
+            },
+            "attempt": {
+              "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+              "attempt_number": 1,
+              "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+            },
+            "failure": {
+              "code": "worker.permanent",
+              "details": {
+                "media_type": "text/plain",
+                "bytes": [
+                  102,
+                  97,
+                  105,
+                  108,
+                  117,
+                  114,
+                  101,
+                  45,
+                  100,
+                  101,
+                  116,
+                  97,
+                  105,
+                  108,
+                  115
+                ]
+              }
+            }
+          }
+        },
+        "effects": []
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 2,
+        "state": {
+          "type": "waiting-for-retry",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "attempt_number": 1,
+            "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+          },
+          "failure": {
+            "code": "worker.transient",
+            "details": {
+              "media_type": "text/plain",
+              "bytes": [
+                102,
+                97,
+                105,
+                108,
+                117,
+                114,
+                101,
+                45,
+                100,
+                101,
+                116,
+                97,
+                105,
+                108,
+                115
+              ]
+            }
+          },
+          "timer": {
+            "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+            "effect_id": "effect-2dcf79547b357b41ddf9d9219416d132438b948537e70a286daccf9b29d33b83",
+            "failed_attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "next_attempt_number": 2,
+            "delay_ms": 10
+          }
+        }
+      },
+      "event": {
+        "type": "timer-fired",
+        "execution_id": "wrong-execution",
+        "expected_revision": 2,
+        "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+        "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+        "next_attempt_number": 2
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "execution-id-mismatch",
+          "message": "event execution id does not match snapshot"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 2,
+        "state": {
+          "type": "waiting-for-retry",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "attempt_number": 1,
+            "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+          },
+          "failure": {
+            "code": "worker.transient",
+            "details": {
+              "media_type": "text/plain",
+              "bytes": [
+                102,
+                97,
+                105,
+                108,
+                117,
+                114,
+                101,
+                45,
+                100,
+                101,
+                116,
+                97,
+                105,
+                108,
+                115
+              ]
+            }
+          },
+          "timer": {
+            "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+            "effect_id": "effect-2dcf79547b357b41ddf9d9219416d132438b948537e70a286daccf9b29d33b83",
+            "failed_attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "next_attempt_number": 2,
+            "delay_ms": 10
+          }
+        }
+      },
+      "event": {
+        "type": "timer-fired",
+        "execution_id": "execution-retry",
+        "expected_revision": 1,
+        "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+        "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+        "next_attempt_number": 2
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "stale-revision",
+          "message": "event expects revision ExecutionRevision(1), but snapshot is ExecutionRevision(2)"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 2,
+        "state": {
+          "type": "waiting-for-retry",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "attempt_number": 1,
+            "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+          },
+          "failure": {
+            "code": "worker.transient",
+            "details": {
+              "media_type": "text/plain",
+              "bytes": [
+                102,
+                97,
+                105,
+                108,
+                117,
+                114,
+                101,
+                45,
+                100,
+                101,
+                116,
+                97,
+                105,
+                108,
+                115
+              ]
+            }
+          },
+          "timer": {
+            "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+            "effect_id": "effect-2dcf79547b357b41ddf9d9219416d132438b948537e70a286daccf9b29d33b83",
+            "failed_attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "next_attempt_number": 2,
+            "delay_ms": 10
+          }
+        }
+      },
+      "event": {
+        "type": "timer-fired",
+        "execution_id": "execution-retry",
+        "expected_revision": 2,
+        "timer_id": "wrong-timer",
+        "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+        "next_attempt_number": 2
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "timer-mismatch",
+          "message": "timer event does not match pending retry timer"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 2,
+        "state": {
+          "type": "waiting-for-retry",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "attempt_number": 1,
+            "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+          },
+          "failure": {
+            "code": "worker.transient",
+            "details": {
+              "media_type": "text/plain",
+              "bytes": [
+                102,
+                97,
+                105,
+                108,
+                117,
+                114,
+                101,
+                45,
+                100,
+                101,
+                116,
+                97,
+                105,
+                108,
+                115
+              ]
+            }
+          },
+          "timer": {
+            "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+            "effect_id": "effect-2dcf79547b357b41ddf9d9219416d132438b948537e70a286daccf9b29d33b83",
+            "failed_attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "next_attempt_number": 2,
+            "delay_ms": 10
+          }
+        }
+      },
+      "event": {
+        "type": "timer-fired",
+        "execution_id": "execution-retry",
+        "expected_revision": 2,
+        "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+        "activation_id": "wrong-activation",
+        "next_attempt_number": 2
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "activation-mismatch",
+          "message": "attempt result does not match pending activation"
+        }
+      }
+    },
+    {
+      "snapshot": {
+        "execution_id": "execution-retry",
+        "plan_reference": {
+          "workflow_id": "retry-lifecycle",
+          "fingerprint": "bf8ceadf27d6b131a1455cd678e5b46385ee9c3d6345ed736117a0d74218047b"
+        },
+        "revision": 2,
+        "state": {
+          "type": "waiting-for-retry",
+          "activation": {
+            "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+            "activation_revision": 1,
+            "node_id": "work",
+            "input": {
+              "media_type": "text/plain",
+              "bytes": [
+                105,
+                110,
+                112,
+                117,
+                116
+              ]
+            }
+          },
+          "attempt": {
+            "attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "attempt_number": 1,
+            "effect_id": "effect-453b33d1c549d5890e6ebd1e0da56b23b7fac5293d21df417f0c3cef965114f4"
+          },
+          "failure": {
+            "code": "worker.transient",
+            "details": {
+              "media_type": "text/plain",
+              "bytes": [
+                102,
+                97,
+                105,
+                108,
+                117,
+                114,
+                101,
+                45,
+                100,
+                101,
+                116,
+                97,
+                105,
+                108,
+                115
+              ]
+            }
+          },
+          "timer": {
+            "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+            "effect_id": "effect-2dcf79547b357b41ddf9d9219416d132438b948537e70a286daccf9b29d33b83",
+            "failed_attempt_id": "attempt-46d87cdaa5abce5cbc0d71b28f49cbd7c1ecbb84cd5f06a5b0eea2260c60fc21",
+            "next_attempt_number": 2,
+            "delay_ms": 10
+          }
+        }
+      },
+      "event": {
+        "type": "timer-fired",
+        "execution_id": "execution-retry",
+        "expected_revision": 2,
+        "timer_id": "timer-139babbe7dee5fbdb6e92354a935f152537bf4d85602ff75dca50665f88a7f52",
+        "activation_id": "activation-3dd24c40c996540839b7f656e8174261c21c42e1f09defccfd2dfd7b69c4e73a",
+        "next_attempt_number": 3
+      },
+      "expected": {
+        "outcome": "error",
+        "error": {
+          "code": "attempt-number-mismatch",
+          "message": "attempt result number does not match pending attempt"
+        }
+      }
+    }
+  ]
+}
