@@ -1,9 +1,5 @@
 [workspace]
-members = [
-    "crates/flower-component",
-    "crates/flower-component-tools",
-    "crates/flower-engine",
-    "crates/flower-engine-tests",
+members = ["crates/core", "crates/ffi",
 ]
 resolver = "3"
 
@@ -11,13 +7,6 @@ resolver = "3"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
+authors = ["Ezhana"]
 
 [workspace.dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = "2"
-anyhow = "1"
-wit-bindgen = "0.47"
-sha2 = "0.10"
-wasmparser = "0.240"
-wit-component = "0.240"
