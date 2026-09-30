@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "xtask",
     "crates/cli",
     "crates/core",
     "crates/ffi",

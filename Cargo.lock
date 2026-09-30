@@ -32,7 +32,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
-name = "flower"
+name = "flower-core"
 version = "0.1.0"
 dependencies = [
  "crossbeam-deque",
@@ -43,7 +43,7 @@ dependencies = [
 name = "flower-ffi"
 version = "0.1.0"
 dependencies = [
- "flower",
+ "flower-core",
 ]
 
 [[package]]
@@ -186,3 +186,7 @@ name = "unicode-ident"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d245f478577f809a851594d02313b640fb437e0bb33866753cff937863096954"
+
+[[package]]
+name = "xtask"
+version = "0.1.0"

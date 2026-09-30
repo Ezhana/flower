@@ -1,12 +1,12 @@
 [package]
-name = "flower"
+name = "flower-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
 [lib]
-name = "flower"
+name = "flower_core"
 path = "src/lib.rs"
 
 [dependencies]

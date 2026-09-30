@@ -1,61 +1,63 @@
-#include <stdio.h>
+#include <cstdlib>
+#include <iomanip>
+#include <iostream>
 
 #include "flower.h"
 
-static int check_status(
+static void require_ok(
     DemoStatus status,
     const char* operation
 ) {
     if (status != DEMO_STATUS_OK) {
-        fprintf(
-            stderr,
-            "%s failed: %s\n",
-            operation,
-            demo_status_string(status)
-        );
+        std::cerr
+            << operation
+            << " failed: "
+            << demo_status_string(status)
+            << '\n';
 
-        return 0;
+        std::exit(1);
     }
-
-    return 1;
 }
 
-int main(void) {
+int main() {
     DemoCalculator* calc =
         demo_calculator_create(100.0);
 
     if (!calc) {
-        fprintf(stderr, "create failed\n");
+        std::cerr << "create failed\n";
         return 1;
     }
 
-    int rc = 0;
-
-    rc |= !check_status(
+    require_ok(
         demo_calculator_add(calc, 50.0),
         "add"
     );
 
-    rc |= !check_status(
+    require_ok(
         demo_calculator_multiply(calc, 2.0),
         "multiply"
     );
 
-    rc |= !check_status(
+    require_ok(
         demo_calculator_discount(calc, 10.0),
         "discount"
     );
 
     double value = 0.0;
 
-    rc |= !check_status(
+    require_ok(
         demo_calculator_value(calc, &value),
         "value"
     );
 
-    printf("value = %.2f\n", value);
+    std::cout
+        << std::fixed
+        << std::setprecision(2)
+        << "value = "
+        << value
+        << '\n';
 
     demo_calculator_destroy(calc);
 
-    return rc ? 1 : 0;
+    return 0;
 }
