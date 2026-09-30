@@ -10,3 +10,5 @@ name = "flower_core"
 path = "src/lib.rs"
 
 [dependencies]
+futures = "0.3.34"
+crossbeam-deque = "0.8.8"
