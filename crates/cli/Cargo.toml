@@ -1,13 +1,8 @@
 [package]
-name = "flower-ffi"
+name = "cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
 
-[lib]
-name = "flower_ffi"
-crate-type = ["cdylib", "staticlib"]
-
 [dependencies]
-flower = {path = "../core"}

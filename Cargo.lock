@@ -3,6 +3,10 @@
 version = 4
 
 [[package]]
+name = "cli"
+version = "0.1.0"
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -28,7 +32,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a31eee39dddec8330830986fcd7625edb5a24ec90ea038215273bbc3adb08ac6"
 
 [[package]]
-name = "flower-core"
+name = "flower"
 version = "0.1.0"
 dependencies = [
  "crossbeam-deque",
@@ -39,7 +43,7 @@ dependencies = [
 name = "flower-ffi"
 version = "0.1.0"
 dependencies = [
- "flower-core",
+ "flower",
 ]
 
 [[package]]

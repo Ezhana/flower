@@ -1,4 +1,4 @@
-use flower_core::Calculator;
+use flower::Calculator;
 use std::ffi::c_int;
 use std::ptr;
 
